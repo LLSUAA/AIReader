@@ -2,7 +2,7 @@ var $ = function (sel) { return document.querySelector(sel); };
 
 var defaults = {
   apikey: "",
-  model: "deepseek-chat",
+  model: "deepseek-v4-flash",
   endpoint: "https://api.deepseek.com/chat/completions"
 };
 
@@ -59,7 +59,7 @@ async function saveConfig() {
 
 async function testConnection() {
   var apikey = $("#apikey").value.trim();
-  var model = $("#model").value.trim() || "deepseek-chat";
+  var model = $("#model").value.trim() || "deepseek-v4-flash";
   var endpoint = normalizeEndpoint($("#endpoint").value.trim());
 
   if (!apikey) {
@@ -98,5 +98,6 @@ async function testConnection() {
 
 $("#btn-save").addEventListener("click", saveConfig);
 $("#btn-test").addEventListener("click", testConnection);
+$("#btn-close").addEventListener("click", function() { window.close(); });
 
 loadConfig();

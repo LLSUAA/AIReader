@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIReader - 数字中枢</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📚</div>
+      <span>AIReader</span>
+    </div>
+    <nav class="nav-menu">
+      <a href="#" class="nav-item active" data-target="view-books">我的书架</a>
+      <a href="#" class="nav-item" data-target="view-arsenal">🌟 知识武器库</a>
+      <a href="options.html" target="_blank" class="nav-item">⚙️ 配置中心</a>
+    </nav>
+  </div>
+  <main class="main-content">
+    <div id="view-books" class="view-section active">
+      <div class="section-header">
+        <h2>我的书架</h2>
+        <label class="btn-primary">
+          导入新书
+          <input type="file" id="lib-file-input" accept=".epub,.txt" hidden>
+        </label>
+      </div>
+      <div class="bg-watermark">📥 支持全局拖拽导入 EPUB 书籍</div>
+      <div class="book-grid" id="book-grid"></div>
+    </div>
+    <div id="view-arsenal" class="view-section" style="display: none;">
+      <div class="section-header">
+        <h2>知识武器库</h2>
+        <span class="subtitle">你淬炼出的所有宏观认知与交易原则</span>
+      </div>
+      <div class="principle-list" id="principle-list"></div>
+    </div>
+  </main>
+
+  <!-- 全局拖拽遮罩 -->
+  <div id="drag-overlay" class="drag-overlay" style="display: none;">
+    <div class="drag-content">
+      <div style="font-size: 64px; margin-bottom: 16px;">📥</div>
+      <h2>松开鼠标，将书籍导入书架</h2>
+    </div>
+  </div>
+
+  <script src="jszip.min.js"></script>
+  <script src="marked.min.js"></script>
+  <script src="skills/db.js"></script>
+  <script src="skills/library.js"></script>
+</body>
+</html>
