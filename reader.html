@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIReader - 深度认知伴侣</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- ====== 左侧：主阅读区 ====== -->
+    <main class="reader-pane" id="reader-pane">
+
+      <!-- 未加载时的文件选择区域 -->
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-zone-inner">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 01-2.5-2.5z"/>
+            <path d="M8 7h8M8 11h6M8 15h4"/>
+          </svg>
+          <p class="drop-label">拖拽 EPUB 文件到此处</p>
+          <p class="drop-hint">或点击选择文件</p>
+          <input type="file" accept=".epub" id="file-input" class="file-input-hidden">
+        </div>
+      </div>
+
+      <!-- 加载后的阅读渲染区 -->
+      <div class="viewer-container" id="viewer-container" style="display:none;">
+        <div class="topbar">
+          <span class="topbar-title" id="book-title">未命名书籍</span>
+          <div class="topbar-actions">
+            <button class="topbar-btn" id="btn-theme" title="切换深浅色主题">🌓</button>
+            <button class="topbar-btn" id="btn-close" title="关闭当前书籍">&times;</button>
+          </div>
+        </div>
+        <div id="viewer" class="viewer"></div>
+        <div class="bottombar">
+          <button class="nav-btn" id="btn-prev" title="上一页 (←)">← 上一页</button>
+          <span class="page-indicator" id="page-indicator">—</span>
+          <button class="nav-btn" id="btn-next" title="下一页 (→)">下一页 →</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ====== 右侧：AI 心智面板 ====== -->
+    <aside class="ai-pane" id="ai-pane">
+      <div class="ai-header">
+        <span class="ai-header-title">AI 心智面板</span>
+      </div>
+
+      <div class="ai-actions">
+        <button class="ai-btn" data-action="outline">
+          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+          </svg>
+          提炼本章骨架
+        </button>
+        <button class="ai-btn" data-action="quiz">
+          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
+          </svg>
+          深度反问测验
+        </button>
+        <button class="ai-btn" data-action="explain">
+          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 16v-4M12 8h.01"/>
+          </svg>
+          解释当前段落
+        </button>
+        <button class="ai-btn" data-action="custom">
+          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+          自由提问
+        </button>
+      </div>
+
+      <div class="ai-output" id="ai-output">
+        <div class="ai-placeholder">
+          <svg class="ai-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+          <p>AI 输出将在此显示</p>
+          <p class="ai-placeholder-hint">选中文本或点击上方按钮开始</p>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script src="localforage.min.js"></script>
+  <script src="jszip.min.js"></script>
+  <script src="epub.min.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>

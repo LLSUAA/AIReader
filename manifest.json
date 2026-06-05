@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "AIReader - 深度认知伴侣",
+  "version": "1.0.0",
+  "description": "硬核 AI 辅助阅读器，极简、极速的阅读+AI心智伴随体验",
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_title": "打开 AIReader 阅读引擎"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "icons": {}
+}

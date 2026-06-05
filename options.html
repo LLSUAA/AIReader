@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIReader - 配置中心</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --danger: #f85149;
+      --input-bg: #0d1117;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .header {
+      margin-bottom: 32px;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 6px;
+    }
+
+    .header p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    .field {
+      margin-bottom: 20px;
+    }
+
+    .field:last-of-type {
+      margin-bottom: 24px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .field .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: #238636;
+      color: #fff;
+      border-color: rgba(240, 246, 252, 0.1);
+    }
+
+    .btn-primary:hover {
+      background: #2ea043;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(177, 186, 196, 0.08);
+    }
+
+    .toast {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .toast.success {
+      background: rgba(46, 160, 67, 0.15);
+      border: 1px solid rgba(46, 160, 67, 0.3);
+      color: #3fb950;
+    }
+
+    .toast.error {
+      background: rgba(248, 81, 73, 0.15);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      color: #f85149;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AIReader 配置</h1>
+      <p>管理 DeepSeek API 密钥与端点，所有数据本地加密存储。</p>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="apikey">DeepSeek API Key</label>
+        <p class="hint">在 DeepSeek 开放平台创建 API Key 后粘贴至此。</p>
+        <input type="password" id="apikey" placeholder="sk-xxxxxxxxxxxxxxxx" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="model">模型名称</label>
+        <p class="hint">选择或输入模型名称，支持 DeepSeek 全系列模型。</p>
+        <input list="model-list" id="model" placeholder="deepseek-chat">
+        <datalist id="model-list">
+          <option value="deepseek-chat">
+          <option value="deepseek-reasoner">
+        </datalist>
+      </div>
+
+      <div class="field">
+        <label for="endpoint">API Endpoint</label>
+        <p class="hint">默认 DeepSeek 官方端点，可替换为本地/云端代理地址。</p>
+        <input type="text" id="endpoint" placeholder="https://api.deepseek.com/chat/completions">
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="btn-save">保存配置</button>
+        <button class="btn btn-secondary" id="btn-test">测试连接</button>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
