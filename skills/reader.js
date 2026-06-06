@@ -131,22 +131,24 @@
   }
 
   function updatePageIndicator() {
-    if (!rendition) return;
+    if (!rendition || !book) return;
     const location = rendition.currentLocation();
     if (location && location.start) {
-      // 1. 持久化当前阅读位置（按书名存储，实现多书记忆）
       if (currentBookMeta) {
         const saveObj = {};
         saveObj[currentBookMeta] = location.start.cfi;
         chrome.storage.local.set(saveObj);
       }
       
-      // 2. 全局页码计算与显示
-      if (book.locations && book.locations.length > 0) {
-        const percentage = book.locations.percentageFromCfi(location.start.cfi);
-        const total = book.locations.total;
-        const current = Math.floor(percentage * total) + 1;
-        pageIndicator.textContent = `${current} / ${total}`;
+      // 使用 spine 索引计算百分比进度，彻底解决计算卡死问题
+      if (book.spine) {
+        const spineItems = book.spine.spineItems || book.spine.items;
+        if (spineItems && spineItems.length > 0) {
+          const currentIndex = location.start.index;
+          // 确保进度在 1% 到 100% 之间
+          const percentage = Math.max(1, Math.round((currentIndex / spineItems.length) * 100));
+          pageIndicator.textContent = `${percentage}%`;
+        }
       }
     }
   }
@@ -171,13 +173,13 @@
         flow: "paginated"
       });
 
-      // 注册 epub.js 内部主题
+      // 注册 epub.js 内部主题，强行穿透 iframe 设置大字号与行距
       rendition.themes.register("light", {
-        "body": { "background": "transparent", "color": "#1A1D20 !important" },
+        "body": { "background": "transparent", "color": "#1A1D20 !important", "font-size": "18px !important", "line-height": "1.8 !important" },
         "p, div, span, h1, h2, h3, h4": { "color": "#1A1D20 !important" }
       });
       rendition.themes.register("dark", {
-        "body": { "background": "transparent", "color": "#c9d1d9 !important" },
+        "body": { "background": "transparent", "color": "#c9d1d9 !important", "font-size": "18px !important", "line-height": "1.8 !important" },
         "p, div, span, h1, h2, h3, h4": { "color": "#c9d1d9 !important" }
       });
 
@@ -199,21 +201,9 @@
 
       await rendition.display(startCfi);
 
-      // 异步生成全局页码索引（带超时降级保护）
-      pageIndicator.textContent = "正在扫描全书...";
+      // 书籍就绪后直接显示进度百分比
       book.ready.then(function () {
-        // 增加字符跨度到 2000 以提升大文件的计算速度
-        const generatePromise = book.locations.generate(2000);
-        // 强制 8 秒超时保护
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("计算超时")), 8000));
-        
-        return Promise.race([generatePromise, timeoutPromise]);
-      }).then(function () {
         updatePageIndicator();
-      }).catch(function (err) {
-        console.warn("分页计算中止 (文件过大):", err);
-        // 降级为章节内进度显示
-        pageIndicator.textContent = "●"; 
       });
 
     } catch (err) {

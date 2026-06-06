@@ -24,8 +24,8 @@
     <head>
       <title>${title}</title>
       <style>
-        body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 1.15em; line-height: 1.7; padding: 2% 4%; color: inherit; }
-        p { margin: 0.8em 0; text-align: justify; }
+        body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 1.25em; line-height: 1.65; padding: 2% 4%; color: inherit; }
+        p { margin: 0.3em 0; text-align: justify; text-indent: 2em; }
       </style>
     </head>
     <body>${htmlContent}</body></html>`;

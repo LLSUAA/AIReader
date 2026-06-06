@@ -9,16 +9,31 @@
 <body>
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-icon">📚</div>
+      <img src="icons/icon32.png" class="logo-icon" style="width:24px; height:24px; border-radius:4px;">
       <span>AIReader</span>
     </div>
     <nav class="nav-menu">
-      <a href="#" class="nav-item active" data-target="view-books">我的书架</a>
-      <a href="#" class="nav-item" data-target="view-arsenal">🌟 知识武器库</a>
-      <a href="options.html" target="_blank" class="nav-item">⚙️ 配置中心</a>
+      <a href="#" class="nav-item active" data-target="view-books">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        我的书架
+      </a>
+      <a href="#" class="nav-item" data-target="view-arsenal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        知识武器库
+      </a>
+      <a href="#" class="nav-item" data-target="view-about">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        关于本插件
+      </a>
+      <a href="options.html" target="_blank" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        配置中心
+      </a>
     </nav>
   </div>
+  
   <main class="main-content">
+    
     <div id="view-books" class="view-section active">
       <div class="section-header">
         <h2>我的书架</h2>
@@ -30,16 +45,39 @@
       <div class="bg-watermark">📥 支持全局拖拽导入 EPUB 书籍</div>
       <div class="book-grid" id="book-grid"></div>
     </div>
+
     <div id="view-arsenal" class="view-section" style="display: none;">
       <div class="section-header">
         <h2>知识武器库</h2>
         <span class="subtitle">你淬炼出的所有宏观认知与交易原则</span>
       </div>
       <div class="principle-list" id="principle-list"></div>
+    </div> 
+    
+    <div id="view-about" class="view-section" style="display: none;">
+      <div class="section-header">
+        <h2>关于本插件</h2>
+        <span class="subtitle">AIReader - 斯巴达式硬核精读指南</span>
+      </div>
+      <div class="p-text" style="max-width: 800px;">
+        <h3>核心理念</h3>
+        <p>本插件致力于提供“沉浸式”与“反人性”的硬核精读体验。通过“盲盒锁死”的强制输出机制与底层逻辑拆解，拒绝被动投喂，帮助你搭建属于自己的跨学科数字研究院。</p>
+        
+        <h3>四大核心技能</h3>
+        <ul>
+          <li><strong>前文复盘回顾：</strong> 提取隐性线索，串联底层认知框架。</li>
+          <li><strong>提炼本章骨架：</strong> 直击第一性原理，剥离冗余修饰。</li>
+          <li><strong>解释选中段落：</strong> 跨语境映射，用现实案例具象化复杂概念。</li>
+          <li><strong>沙盘推演测验：</strong> 抛出高阶反问，UI 强制锁死，逼迫你完成逻辑闭环。</li>
+        </ul>
+
+        <h3>知识武器库</h3>
+        <p>阅读中与导师对话产生的每一次顿悟，都可点击“🌟 收藏为知识晶体”，它们将永久沉淀在你的第二大脑中，并可随时一键复制流转。</p>
+      </div>
     </div>
+
   </main>
 
-  <!-- 全局拖拽遮罩 -->
   <div id="drag-overlay" class="drag-overlay" style="display: none;">
     <div class="drag-content">
       <div style="font-size: 64px; margin-bottom: 16px;">📥</div>
