@@ -104,17 +104,43 @@
     // 容错修复：
     // 1) 删除对象/数组末尾的多余逗号（模型常见输出错误）
     // 2) 在两个字符串/值之间补缺失逗号（如 ["a" "b"]、{"a":1 "b":2}）
-    const repaired = candidate
-      .replace(/,\s*([}\]])/g, "$1")
-      .replace(/(?<![:\{,])[\t ]+(?=")/g, ",");
+    // 修复 1：删除尾逗号；修复 2：补缺失逗号；修复 3：字符串内的裸换行/回车/Tab 转义
+    const repaired = sanitizeJSONStrings(
+      candidate
+        .replace(/,\s*([}\]])/g, "$1")
+        .replace(/(?<![:\{,])[\t ]+(?=")/g, ",")
+    );
 
-    try {
-      return JSON.parse(repaired);
-    } catch (e) {
-      // 修复失败时，若原始候选本身可解析则返回原始（防止修复过度）
-      return JSON.parse(candidate);
-    }
+    let lastErr = null;
+    try { return JSON.parse(repaired); } catch (e) { lastErr = e; }
+    // 修复可能过度（误伤正常 JSON），退回原始候选
+    try { return JSON.parse(candidate); } catch (e) { /* 保留原始错误 */ }
+    throw lastErr || new Error("无法从模型输出中解析 JSON");
   };
+
+  // 模型常把换行/回车/Tab 直接写进 JSON 字符串值（未转义），逐字符扫描修复
+  function sanitizeJSONStrings(text) {
+    let out = "";
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) { out += ch; escaped = false; continue; }
+        if (ch === "\\") { out += ch; escaped = true; continue; }
+        if (ch === '"') { out += ch; inString = false; continue; }
+        if (ch === "\n" || ch === "\r" || ch === "\t") {
+          out += ch === "\n" ? "\\n" : ch === "\r" ? "\\r" : "\\t";
+          continue;
+        }
+        out += ch;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+    return out;
+  }
 
   // 兼容不同厂商的 content 结构：字符串 / 分块数组 / 缺失
   function getMessageContent(message) {

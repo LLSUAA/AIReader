@@ -101,6 +101,7 @@
 1. 只输出 JSON 对象，不要输出任何其他文字或代码围栏。
 2. 若片段信息不足以支撑某个论点，不要写，宁缺毋滥。
 3. confidence 为 low 时，表示本片段信息密度低或难以确定结构。
+4. 若片段包含多个章节/模块，core_points 必须覆盖片段内出现的每一个章节/模块（每个至少一条），禁止只写片段开头的部分。
 
 文本片段：
 ${chunk.text}`;
@@ -172,14 +173,22 @@ ${chunk.text}`;
   // ---------- 第三层：全局综合（Reduce） ----------
   const REDUCE_SYSTEM = "你是一名知识提取专家。你的唯一任务是：只基于用户提供的结构化章节摘要进行综合归纳，生成全书框架。绝对禁止编造摘要中不存在的内容，禁止引用摘要之外的知识。";
 
-  function buildReducePrompt(results, bookTitle) {
-    const summaries = results.map(r => ({
+  function buildReducePrompt(results, bookTitle, failedLabels) {
+    // 提取失败的分块不进入综合，避免骨架出现"提取失败"占位章节
+    const isFailed = function (r) {
+      return !!(r.core_points && r.core_points[0] && r.core_points[0].indexOf("该块提取失败") !== -1);
+    };
+    const usable = results.filter(function (r) { return !isFailed(r); });
+    const summaries = usable.map(r => ({
       chapter: r.chapter,
       core_points: r.core_points,
       concepts: r.concepts,
       relation_to_prev: r.relation_to_prev,
       confidence: r.confidence
     }));
+    const failedNote = (failedLabels && failedLabels.length)
+      ? "\n\n注意：本次有 " + failedLabels.length + " 个分块提取失败（" + failedLabels.join("；") + "）。这些块的内容不可用，禁止虚构；请在框架的溯源说明中注明这些块未能提取。"
+      : "";
     return `以下是《${bookTitle}》全部分块的结构化摘要（JSON 数组）。请综合这些摘要，生成全书框架。
 
 必须输出一个 JSON 对象，字段如下：
@@ -202,6 +211,8 @@ ${chunk.text}`;
 4. 章节骨架中每一章的标题必须使用摘要提供的原文章节名，禁止自拟、合并或改名；摘要中出现的所有章节都必须覆盖，每章至少一条要点。
 5. 涉及具体数字（层数、占比、概率、年份）时必须与摘要完全一致，禁止改写。
 6. Mermaid 中同一概念只能出现一个节点，禁止重复命名。
+
+${failedNote}
 
 分块摘要：
 ${JSON.stringify(summaries)}`;
@@ -236,7 +247,8 @@ ${JSON.stringify(summaries)}`;
     let text = String(raw || "").trim();
     if (text.startsWith("{")) {
       try {
-        const parsed = JSON.parse(text);
+        // 用容错解析（含尾逗号/缺失逗号/字符串内换行修复），嵌套 JSON 也能解包
+        const parsed = global.extractJSONContent(text);
         if (parsed && typeof parsed === "object") return global.normalizeFrameworkMarkdown(parsed);
       } catch (e) { /* 不是 JSON，按原文处理 */ }
     }
@@ -339,12 +351,16 @@ ${JSON.stringify(summaries)}`;
       label: "正在综合生成全书框架..."
     });
 
+    const failedLabels = results
+      .filter(r => r.core_points && r.core_points[0] && r.core_points[0].indexOf("该块提取失败") !== -1)
+      .map(r => r.chapter);
+
     let reduceResult;
     try {
       reduceResult = await requestWithRetry(
         [
           { role: "system", content: REDUCE_SYSTEM },
-          { role: "user", content: buildReducePrompt(results, options.bookTitle || "未命名书籍") }
+          { role: "user", content: buildReducePrompt(results, options.bookTitle || "未命名书籍", failedLabels) }
         ],
         options,
         aborter,
