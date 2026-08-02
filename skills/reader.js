@@ -405,6 +405,45 @@
   const extractCancel = document.getElementById("extract-cancel");
   let extractMarkdownCache = "";
   let extractRunning = false;
+  let extractTimerId = null;
+  let extractStartTime = 0;
+
+  function formatExtractTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = function (n) { return String(n).padStart(2, "0"); };
+    return (h > 0 ? h + ":" : "") + pad(m) + ":" + pad(s);
+  }
+
+  function setExtractTimerText(ms) {
+    const el = document.getElementById("extract-timer");
+    if (el) el.textContent = "⏱ " + formatExtractTime(ms);
+  }
+
+  function startExtractTimer() {
+    stopExtractTimer();
+    extractStartTime = Date.now();
+    setExtractTimerText(0);
+    extractTimerId = setInterval(function () {
+      setExtractTimerText(Date.now() - extractStartTime);
+    }, 1000);
+  }
+
+  function stopExtractTimer() {
+    if (extractTimerId !== null) {
+      clearInterval(extractTimerId);
+      extractTimerId = null;
+    }
+    // 结束时定格最终用时（仅在有计时记录时）
+    if (extractStartTime) setExtractTimerText(Date.now() - extractStartTime);
+  }
+
+  function finishExtractRun() {
+    extractRunning = false;
+    stopExtractTimer();
+  }
 
   function openExtractModal() {
     if (extractModal) extractModal.classList.add("open");
@@ -415,11 +454,14 @@
     if (extractRunning && !confirm("提取正在进行，确定要取消吗？")) return;
     if (typeof window.cancelExtraction === "function") window.cancelExtraction();
     if (extractModal) extractModal.classList.remove("open");
-    extractRunning = false;
+    finishExtractRun();
   }
 
   function resetExtractUI() {
     extractMarkdownCache = "";
+    stopExtractTimer();
+    extractStartTime = 0;
+    setExtractTimerText(0);
     if (extractStatus) extractStatus.innerHTML = "";
     if (extractResult) { extractResult.style.display = "none"; extractResult.innerHTML = ""; }
     if (extractActions) extractActions.style.display = "none";
@@ -461,7 +503,7 @@
     if (!markdown) {
       if (extractProgressText) extractProgressText.textContent = "❌ 模型返回的框架内容无效";
       if (extractCancel) extractCancel.style.display = "inline-block";
-      extractRunning = false;
+      finishExtractRun();
       return;
     }
     extractMarkdownCache = markdown;
@@ -519,7 +561,7 @@
               await window.saveExtraction(Object.assign({}, cached, { result_markdown: md, updatedAt: Date.now() }));
             }
           }
-          extractRunning = false;
+          finishExtractRun();
           return;
         }
       } catch (e) { /* 缓存读取失败按新提取处理 */ }
@@ -532,6 +574,8 @@
       runningChunks = cached.chunks.slice();
       if (extractProgressText) extractProgressText.textContent = "检测到未完成的提取，正在恢复进度...";
     }
+
+    startExtractTimer();
 
     try {
       const outcome = await window.extractBookFramework(book, {
@@ -557,7 +601,7 @@
       });
       if (outcome.cancelled) {
         if (extractProgressText) extractProgressText.textContent = "已取消提取";
-        extractRunning = false;
+        finishExtractRun();
         return;
       }
       const markdown = typeof window.normalizeFrameworkMarkdown === "function"
@@ -573,12 +617,12 @@
         updatedAt: Date.now()
       });
       showExtractResult(markdown, false);
-      extractRunning = false;
+      finishExtractRun();
     } catch (e) {
       console.error("全书提取失败:", e);
       if (extractProgressText) extractProgressText.textContent = "❌ 提取失败：" + e.message;
       if (extractCancel) extractCancel.style.display = "inline-block";
-      extractRunning = false;
+      finishExtractRun();
     }
   }
 
