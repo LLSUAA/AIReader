@@ -3,10 +3,11 @@
 
   const DB_NAME = "AIReaderDB";
   const STORE_NAME = "books";
+  const DB_VERSION = 3;
 
   function getDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 2);
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -14,6 +15,9 @@
         }
         if (!db.objectStoreNames.contains("principles")) {
           db.createObjectStore("principles", { keyPath: "id", autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains("extractions")) {
+          db.createObjectStore("extractions", { keyPath: "bookName" });
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -54,8 +58,11 @@
   // 4. 删除单本书
   global.deleteBookFromDB = async function(bookName) {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAME, "readwrite");
+    const tx = db.transaction([STORE_NAME, "extractions"], "readwrite");
     tx.objectStore(STORE_NAME).delete(bookName);
+    // 级联清理：删除书籍时同步删除其全书提取缓存
+    const cleanName = String(bookName).replace(/\.epub$/i, "");
+    tx.objectStore("extractions").delete(cleanName);
     return new Promise((resolve) => { tx.oncomplete = resolve; });
   };
 
@@ -98,6 +105,31 @@
     const tx = db.transaction("principles", "readwrite");
     tx.objectStore("principles").add(principleData);
     return new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+  };
+
+  // ---- 全书提取结果缓存（keyPath: bookName，一书一条，避免重复扣费） ----
+  global.getExtraction = async function(bookName) {
+    const db = await getDB();
+    const tx = db.transaction("extractions", "readonly");
+    const request = tx.objectStore("extractions").get(bookName);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = reject;
+    });
+  };
+
+  global.saveExtraction = async function(extractionData) {
+    const db = await getDB();
+    const tx = db.transaction("extractions", "readwrite");
+    tx.objectStore("extractions").put(extractionData);
+    return new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+  };
+
+  global.deleteExtraction = async function(bookName) {
+    const db = await getDB();
+    const tx = db.transaction("extractions", "readwrite");
+    tx.objectStore("extractions").delete(bookName);
+    return new Promise((resolve) => { tx.oncomplete = resolve; });
   };
 
 })(window);

@@ -1,0 +1,236 @@
+/* ============================================
+   AIReader - 全书框架分层提取管线（Map-Reduce）
+   第一层：结构解析（spine/章节，零幻觉）
+   第二层：逐块摘要 Map（每块独立 JSON）
+   第三层：全局综合 Reduce（只吃摘要，不吃原文）
+   配套：取消机制、单块失败容错、结果由 db.js 缓存
+   ============================================ */
+(function (global) {
+  "use strict";
+
+  const CHUNK_CHARS = 8000;   // 单块最大字符数（约 4-6K tokens）
+  const MAX_CHUNKS = 80;      // 全书最大块数上限，防止极端大书无限调用
+  const MIN_CHUNK_TEXT = 200; // 过短片段（封面/空白页）跳过
+
+  let activeAbort = null;
+
+  global.cancelExtraction = function () {
+    if (activeAbort) activeAbort.abort();
+  };
+
+  // ---------- 第一层：结构解析 ----------
+  // EPUB 按 spine item（通常=章节）切分；超长单章节（如 TXT 转换书）再按段落簇切分
+  function splitLongText(text, label, chunks) {
+    const paragraphs = text.split(/\n+/).map(s => s.trim()).filter(s => s.length > 0);
+    if (paragraphs.length <= 1) {
+      chunks.push({ label: label, text: text.substring(0, CHUNK_CHARS) });
+      return;
+    }
+    let current = [];
+    let currentLen = 0;
+    let part = 0;
+    for (const p of paragraphs) {
+      if (currentLen + p.length > CHUNK_CHARS && current.length) {
+        part++;
+        chunks.push({ label: label + (part > 1 ? "（第" + part + "部分）" : ""), text: current.join("\n\n") });
+        current = [];
+        currentLen = 0;
+      }
+      current.push(p);
+      currentLen += p.length;
+    }
+    if (current.length) {
+      part++;
+      chunks.push({ label: label + (part > 1 ? "（第" + part + "部分）" : ""), text: current.join("\n\n") });
+    }
+  }
+
+  global.buildBookChunks = async function (book) {
+    const chunks = [];
+    const spineItems = (book.spine && (book.spine.spineItems || book.spine.items)) || [];
+
+    for (let i = 0; i < spineItems.length; i++) {
+      const item = spineItems[i];
+      try {
+        await item.load(book.load.bind(book));
+        const doc = item.document;
+        const text = (
+          (doc && doc.body && (doc.body.innerText || doc.body.textContent)) || ""
+        ).trim();
+        if (!text || text.length < MIN_CHUNK_TEXT) continue;
+
+        const label = "第" + (i + 1) + "节";
+        if (text.length <= CHUNK_CHARS) {
+          chunks.push({ label: label, text: text });
+        } else {
+          splitLongText(text, label, chunks);
+        }
+      } catch (e) {
+        // 单个章节加载失败不阻塞整本书
+        console.error("章节加载失败（spine " + i + "）:", e);
+      }
+      if (chunks.length >= MAX_CHUNKS) break;
+    }
+    return chunks;
+  };
+
+  // ---------- 第二层：逐块摘要（Map） ----------
+  const MAP_SYSTEM = "你是一名严谨的书籍结构分析师。你的唯一任务是：只基于用户提供的文本片段提取结构化信息。绝对禁止使用你的训练记忆补充、脑补或编造片段中不存在的内容。";
+
+  function buildMapPrompt(chunk, index, total, bookTitle) {
+    return `请阅读《${bookTitle}》的以下文本片段（${chunk.label}，第 ${index + 1}/${total} 块），提取结构化信息。
+
+必须输出一个 JSON 对象，字段如下：
+{
+  "title": "本片段所属章节/小节名（若文本未给出章节名，用不超过20字概括）",
+  "core_points": ["最多3条核心论点，每条不超过40字，必须能在原文中找到依据"],
+  "concepts": [{"name": "关键概念名，不超过12字", "def": "不超过50字的定义"}],
+  "relation_to_prev": "与上一块的逻辑关系（承接/转折/并列/递进/新话题），一句话不超过30字",
+  "confidence": "high 或 medium 或 low"
+}
+
+约束：
+1. 只输出 JSON 对象，不要输出任何其他文字或代码围栏。
+2. 若片段信息不足以支撑某个论点，不要写，宁缺毋滥。
+3. confidence 为 low 时，表示本片段信息密度低或难以确定结构。
+
+文本片段：
+${chunk.text}`;
+  }
+
+  function normalizeChunk(data, fallbackTitle) {
+    const d = data && typeof data === "object" ? data : {};
+    const corePoints = Array.isArray(d.core_points)
+      ? d.core_points.map(String)
+      : (d.corePoints ? [String(d.corePoints)] : []);
+    const concepts = Array.isArray(d.concepts)
+      ? d.concepts.map(c => ({ name: String(c.name || ""), def: String(c.def || "") }))
+      : [];
+    return {
+      chapter: String(d.title || fallbackTitle || "未命名章节"),
+      core_points: corePoints.length ? corePoints : ["（该块未能提取出核心论点）"],
+      concepts: concepts,
+      relation_to_prev: String(d.relation_to_prev || d.relationToPrev || ""),
+      confidence: String(d.confidence || "medium")
+    };
+  }
+
+  // ---------- 第三层：全局综合（Reduce） ----------
+  const REDUCE_SYSTEM = "你是一名知识提取专家。你的唯一任务是：只基于用户提供的结构化章节摘要进行综合归纳，生成全书框架。绝对禁止编造摘要中不存在的内容，禁止引用摘要之外的知识。";
+
+  function buildReducePrompt(results, bookTitle) {
+    const summaries = results.map(r => ({
+      chapter: r.chapter,
+      core_points: r.core_points,
+      concepts: r.concepts,
+      relation_to_prev: r.relation_to_prev,
+      confidence: r.confidence
+    }));
+    return `以下是《${bookTitle}》全部分块的结构化摘要（JSON 数组）。请综合这些摘要，生成全书框架。
+
+必须输出一个 JSON 对象，字段如下：
+{
+  "book_summary": "一句话定位本书核心主张，不超过40字",
+  "framework_markdown": "完整框架 Markdown 文本，必须依次包含：
+    1. ## 全书定位（一句话）
+    2. ## 章节骨架（按章节层级列出核心论点与关键概念，标注来源章节名）
+    3. ## 核心概念关系（Mermaid 代码块，graph TD 语法，节点用概念名，边用关系短语）
+    4. ## 论证主线（用 A → B → C 的链条呈现全书论证/叙事推进）
+    5. ## 溯源说明（注明：本框架基于分块摘要生成，引用前请核对原文）"
+}
+
+约束：
+1. 只输出 JSON 对象，不要输出任何其他文字或代码围栏。
+2. framework_markdown 内部可以使用 Markdown 语法与 Mermaid 代码围栏。
+3. 所有内容必须能在给定摘要中找到依据；找不到就省略，不要编造。
+
+分块摘要：
+${JSON.stringify(summaries)}`;
+  }
+
+  // ---------- 调度器 ----------
+  global.extractBookFramework = async function (book, options) {
+    options = options || {};
+    const aborter = new AbortController();
+    activeAbort = aborter;
+
+    options.onProgress && options.onProgress({ phase: "start", total: 0, label: "正在切分章节..." });
+    const chunks = await global.buildBookChunks(book);
+    if (!chunks.length) {
+      activeAbort = null;
+      throw new Error("未能从本书提取到任何文本，请确认文件内容可读。");
+    }
+
+    const results = [];
+    for (let i = 0; i < chunks.length; i++) {
+      if (aborter.signal.aborted) return { cancelled: true };
+      options.onProgress && options.onProgress({
+        phase: "map",
+        current: i,
+        total: chunks.length,
+        label: chunks[i].label,
+        status: "running"
+      });
+      try {
+        const data = await global.requestJSON(
+          [
+            { role: "system", content: MAP_SYSTEM },
+            { role: "user", content: buildMapPrompt(chunks[i], i, chunks.length, options.bookTitle || "未命名书籍") }
+          ],
+          options.model,
+          options.endpoint,
+          options.apikey,
+          { maxTokens: 1500, signal: aborter.signal, temperature: 0.2 }
+        );
+        results.push(normalizeChunk(data, chunks[i].label));
+        options.onProgress && options.onProgress({
+          phase: "map",
+          current: i + 1,
+          total: chunks.length,
+          label: chunks[i].label,
+          status: "done"
+        });
+      } catch (e) {
+        if (aborter.signal.aborted) return { cancelled: true };
+        options.onProgress && options.onProgress({
+          phase: "map",
+          current: i + 1,
+          total: chunks.length,
+          label: chunks[i].label,
+          status: "error",
+          error: e.message
+        });
+        // 单块失败不中断全书：写入占位摘要，保证 Reduce 可继续
+        results.push(normalizeChunk({ title: chunks[i].label, core_points: ["（该块提取失败：" + e.message + "）"], confidence: "low" }, chunks[i].label));
+      }
+    }
+
+    if (aborter.signal.aborted) return { cancelled: true };
+    options.onProgress && options.onProgress({
+      phase: "reduce",
+      current: results.length,
+      total: results.length,
+      label: "正在综合生成全书框架..."
+    });
+
+    let reduceResult;
+    try {
+      reduceResult = await global.requestJSON(
+        [
+          { role: "system", content: REDUCE_SYSTEM },
+          { role: "user", content: buildReducePrompt(results, options.bookTitle || "未命名书籍") }
+        ],
+        options.model,
+        options.endpoint,
+        options.apikey,
+        { maxTokens: 4000, signal: aborter.signal, temperature: 0.3 }
+      );
+    } catch (e) {
+      if (aborter.signal.aborted) return { cancelled: true };
+      throw e;
+    }
+
+    activeAbort = null;
+    return { cancelled: false, chunkCount: chunks.length, result: reduceResult };
+  };
+})(window);

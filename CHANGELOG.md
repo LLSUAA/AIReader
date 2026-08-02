@@ -6,6 +6,23 @@
 
 ### Added
 
+- 新增**一键提取全书框架**（阶段 1 核心功能）：
+  - 分层提取管线 `skills/extract.js`：spine/章节切分 → 逐块 Map 摘要（固定 JSON schema）→ 全局 Reduce 综合 → 全书框架 Markdown。
+  - TXT 转换书自动按段落簇切块（每块 ≤8000 字），不再受"单 spine 整本书"限制。
+  - 提取结果弹窗：实时进度（章节 x/N）、失败块容错不中断、取消机制（AbortController）。
+  - 结果落库缓存（IndexedDB `extractions` store，db 版本 v3）：同一本书重复提取直接读缓存，避免重复扣费；支持"重新提取"强制更新。
+  - 一键复制 Markdown / 下载 `.md` 文件（带 BOM，Windows 记事本不乱码）。
+  - `api.js` 新增非流式 JSON 请求 `requestJSON()`（自动回退不支持 `response_format` 的端点）与 token 估算。
+
+### Changed
+
+- 删除书籍时级联清理该书的全书提取缓存。
+- 版本升至 1.1.0。
+
+## [1.0.1] - 2026-08-02
+
+### Added
+
 - 新增正式项目基建：`AGENTS.md`（协作约定）、`CHANGELOG.md`（本文件）、`LICENSE`（MIT）、`.gitignore`。
 - 新增快照存档机制：`docs/snapshots/README.md` 约定 + `docs/snapshots/2026-08-02-v1.0.0/SNAPSHOT.md` 基线快照，并打 git tag `v1.0.0`。
 - 新增 `skills/markdown.js` 安全渲染层：转义 AI 输出中的原始 HTML，外链强制 `rel="noopener noreferrer nofollow"`，并开启 `breaks` 换行。

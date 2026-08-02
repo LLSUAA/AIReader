@@ -240,6 +240,7 @@
     viewer.innerHTML = "";
     showViewer(false);
     clearToc();
+    closeExtractModal();
   }
 
   // ---------- 目录导航（epub.js loaded.navigation） ----------
@@ -392,6 +393,151 @@
     return "";
   }
 
+  // ---------- 一键提取全书框架 ----------
+  const btnExtract = document.getElementById("btn-extract");
+  const extractModal = document.getElementById("extract-modal");
+  const extractProgressWrap = document.getElementById("extract-progress-wrap");
+  const extractProgressFill = document.getElementById("extract-progress-fill");
+  const extractProgressText = document.getElementById("extract-progress-text");
+  const extractStatus = document.getElementById("extract-status");
+  const extractResult = document.getElementById("extract-result");
+  const extractActions = document.getElementById("extract-actions");
+  const extractCancel = document.getElementById("extract-cancel");
+  let extractMarkdownCache = "";
+
+  function openExtractModal() {
+    if (extractModal) extractModal.classList.add("open");
+  }
+
+  function closeExtractModal() {
+    if (typeof window.cancelExtraction === "function") window.cancelExtraction();
+    if (extractModal) extractModal.classList.remove("open");
+  }
+
+  function resetExtractUI() {
+    extractMarkdownCache = "";
+    if (extractStatus) extractStatus.innerHTML = "";
+    if (extractResult) { extractResult.style.display = "none"; extractResult.innerHTML = ""; }
+    if (extractActions) extractActions.style.display = "none";
+    if (extractCancel) extractCancel.style.display = "inline-block";
+    if (extractProgressWrap) extractProgressWrap.style.display = "block";
+    if (extractProgressFill) extractProgressFill.style.width = "0%";
+    if (extractProgressText) extractProgressText.textContent = "正在切分章节...";
+  }
+
+  function renderExtractProgress(p) {
+    if (!p || !extractProgressText || !extractProgressFill) return;
+    if (p.phase === "map") {
+      const pct = Math.round((p.current / p.total) * 100);
+      extractProgressFill.style.width = pct + "%";
+      extractProgressText.textContent = p.label + "（" + p.current + "/" + p.total + "）";
+      if (extractStatus) {
+        const line = document.createElement("div");
+        line.className = "extract-status-line";
+        if (p.status === "error") line.textContent = "⚠️ " + p.label + "：" + p.error;
+        else if (p.status === "done") line.textContent = "✅ " + p.label;
+        else line.textContent = "⏳ " + p.label;
+        extractStatus.appendChild(line);
+        extractStatus.scrollTop = extractStatus.scrollHeight;
+        while (extractStatus.children.length > 100) extractStatus.removeChild(extractStatus.firstChild);
+      }
+    } else if (p.phase === "reduce") {
+      extractProgressFill.style.width = "100%";
+      extractProgressText.textContent = "正在综合生成全书框架...";
+    }
+  }
+
+  function showExtractResult(markdown, fromCache) {
+    extractMarkdownCache = markdown;
+    if (extractProgressWrap) extractProgressWrap.style.display = "none";
+    if (extractCancel) extractCancel.style.display = "none";
+    if (extractProgressText) {
+      extractProgressText.textContent = fromCache ? "已加载缓存结果（可点击「重新提取」更新）" : "提取完成，可复制或下载";
+    }
+    if (extractResult) {
+      extractResult.style.display = "block";
+      extractResult.innerHTML = typeof window.renderMarkdown === "function" ? window.renderMarkdown(markdown) : markdown;
+    }
+    if (extractActions) extractActions.style.display = "flex";
+  }
+
+  async function runExtraction(force) {
+    if (!book || !currentBookMeta) { alert("请先打开一本书。"); return; }
+    let config;
+    try { config = await chrome.storage.local.get(["apikey", "endpoint", "model"]); } catch (e) { alert("读取配置失败：" + e.message); return; }
+    if (!config.apikey) { alert("请先在扩展选项页配置 API Key。"); return; }
+    if (typeof window.extractBookFramework !== "function") { alert("提取模块未加载，请重新加载扩展。"); return; }
+
+    const endpoint = normalizeEndpoint(config.endpoint);
+    const model = config.model || "deepseek-v4-flash";
+    resetExtractUI();
+    openExtractModal();
+
+    // 缓存命中：同一本书已完成提取则直接展示，避免重复扣费
+    if (!force) {
+      try {
+        const cached = await window.getExtraction(currentBookMeta);
+        if (cached && cached.status === "done" && cached.result_markdown) {
+          showExtractResult(cached.result_markdown, true);
+          return;
+        }
+      } catch (e) { /* 缓存读取失败按新提取处理 */ }
+    }
+
+    try {
+      const outcome = await window.extractBookFramework(book, {
+        bookTitle: currentBookMeta,
+        apikey: config.apikey,
+        endpoint: endpoint,
+        model: model,
+        onProgress: renderExtractProgress
+      });
+      if (outcome.cancelled) {
+        if (extractProgressText) extractProgressText.textContent = "已取消提取";
+        return;
+      }
+      const markdown = (outcome.result && outcome.result.framework_markdown) || "";
+      if (!markdown) throw new Error("模型未返回有效的框架内容");
+      await window.saveExtraction({
+        bookName: currentBookMeta,
+        status: "done",
+        book_summary: outcome.result.book_summary || "",
+        result_markdown: markdown,
+        chunkCount: outcome.chunkCount,
+        updatedAt: Date.now()
+      });
+      showExtractResult(markdown, false);
+    } catch (e) {
+      console.error("全书提取失败:", e);
+      if (extractProgressText) extractProgressText.textContent = "❌ 提取失败：" + e.message;
+      if (extractCancel) extractCancel.style.display = "inline-block";
+    }
+  }
+
+  function copyExtractMarkdown() {
+    if (!extractMarkdownCache) return;
+    navigator.clipboard.writeText(extractMarkdownCache).then(function () {
+      const btn = document.getElementById("extract-copy");
+      if (btn) {
+        btn.textContent = "✅ 已复制";
+        setTimeout(function () { btn.textContent = "📋 复制 Markdown"; }, 2000);
+      }
+    }).catch(function () { alert("复制失败，请手动选择文本复制。"); });
+  }
+
+  function downloadExtractMarkdown() {
+    if (!extractMarkdownCache) return;
+    const blob = new Blob(["\uFEFF" + extractMarkdownCache], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (currentBookMeta || "AIReader") + "-全书框架.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
   // ---------- 动作调度器（SKILLS 策略驱动） ----------
   async function handleAIAction(actionKey) {
     const skill = SKILLS[actionKey];
@@ -528,6 +674,28 @@
       handleAIAction(action);
     });
   });
+
+  // 全书提取
+  if (btnExtract) btnExtract.addEventListener("click", function () { runExtraction(false); });
+  const extractClose = document.getElementById("extract-close");
+  if (extractClose) extractClose.addEventListener("click", closeExtractModal);
+  if (extractCancel) {
+    extractCancel.addEventListener("click", function () {
+      if (typeof window.cancelExtraction === "function") window.cancelExtraction();
+      if (extractProgressText) extractProgressText.textContent = "正在取消...";
+    });
+  }
+  const extractCopyBtn = document.getElementById("extract-copy");
+  if (extractCopyBtn) extractCopyBtn.addEventListener("click", copyExtractMarkdown);
+  const extractDownloadBtn = document.getElementById("extract-download");
+  if (extractDownloadBtn) extractDownloadBtn.addEventListener("click", downloadExtractMarkdown);
+  const extractAgainBtn = document.getElementById("extract-again");
+  if (extractAgainBtn) extractAgainBtn.addEventListener("click", function () { runExtraction(true); });
+  if (extractModal) {
+    extractModal.addEventListener("click", function (e) {
+      if (e.target === extractModal) closeExtractModal();
+    });
+  }
 
   // 发送按钮事件
   document.getElementById("btn-send").addEventListener("click", handleUserInput);

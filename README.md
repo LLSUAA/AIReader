@@ -1,6 +1,6 @@
 # AIReader - 深度阅读伴侣
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Chrome_Extension-green.svg)
 ![Tech Stack](https://img.shields.io/badge/tech-Vanilla_JS-orange.svg)
 
@@ -28,6 +28,12 @@ AIReader 是一款基于 Chrome 扩展程序（Manifest V3）构建的本地硬�
 
 - 阅读器顶部工具栏新增 📑 目录按钮：EPUB 书籍按章节树展示，点击即可跳转（TXT 转换书暂无目录结构）。
 
+### 2.6 一键提取全书框架
+
+- AI 面板新增 📖 按钮：自动按章节/文本块切分全书 → 逐块提取核心论点与关键概念 → 全局综合生成"全书定位 + 章节骨架 + 概念关系（Mermaid）+ 论证主线"。
+- 提取过程实时显示进度，单块失败不中断；结果自动缓存，重复提取不重复扣费。
+- 支持一键复制 Markdown 或下载 `.md` 文件（含溯源说明，引用前请核对原文）。
+
 ### 3. 知识武器库 (Knowledge Arsenal)
 - **碎片化采矿**：阅读过程中的高价值对话可一键提炼为“知识晶体”。
 - **沉浸式回顾**：采用精装博客级 CSS 排版（大字号、宽行距、Markdown 实时解析），支持一键复制流转。
@@ -46,6 +52,7 @@ AIReader 是一款基于 Chrome 扩展程序（Manifest V3）构建的本地硬�
 - **核心解析引擎**：`epub.min.js`
 - **打包与渲染**：`jszip.min.js` (内存文件封装), `marked.min.js` (实时 HTML 转换)
 - **安全渲染**：`skills/markdown.js`（唯一允许的 Markdown 出口，转义原始 HTML）
+- **提取管线**：`skills/extract.js`（章节切分 + Map-Reduce 分层提取）
 - **通信协议**：Fetch API + Server-Sent Events (SSE) 处理 LLM 流式输出
 
 ## 物理拓扑
@@ -61,6 +68,7 @@ AIReader/
 └── skills/               # 核心逻辑模块
     ├── db.js             # 数据库引擎
     ├── api.js            # 流式大模型网关
+    ├── extract.js        # 全书框架分层提取管线（Map-Reduce）
     ├── markdown.js       # 安全 Markdown 渲染
     └── skills.js         # 认知技能 Prompt 策略组
 

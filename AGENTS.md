@@ -27,6 +27,7 @@ reader.html/css/js   # 阅读器：阅读区 + AI 面板 + 目录导航
 options.html/js      # 配置中心：API Key / 模型 / Endpoint
 skills/db.js         # IndexedDB 封装（books / principles）
 skills/api.js        # SSE 流式网关（含渲染节流、max_tokens 按技能配置）
+skills/extract.js    # 全书框架分层提取管线（Map-Reduce + 取消机制）
 skills/markdown.js   # 安全 Markdown 渲染（唯一允许的 marked 出口）
 skills/skills.js     # 4 个 AI Skill：getContext + buildPrompt（prompt 是产品灵魂）
 skills/reader.js     # 阅读引擎 + AI 交互调度
@@ -48,6 +49,7 @@ docs/                # 报告、快照、归档
 ## 5. 已知技术约束（改代码前必看）
 
 - **epub.js 0.3**：目录用 `book.loaded.navigation`（Promise → `{ toc: [...] }`）；翻页/定位用 `rendition.currentLocation().start.index` 与 CFI。TOC 条目结构 `{ href, label, subitems }`。
+- **全书提取管线**：`skills/extract.js` 是"一键提取全书框架"的唯一入口。Map 阶段输出固定 JSON schema（title/core_points/concepts/relation_to_prev/confidence），Reduce 阶段输出 `{ book_summary, framework_markdown }`。结果缓存在 IndexedDB `extractions` store（keyPath: bookName），改 schema 时必须同步升级缓存结构（db 版本 v3）。
 - **MV3 CSP**：扩展页禁止内联 `<script>`（event handler 属性也不可用）；跨域 fetch 需要 `host_permissions`（目前声明了 `api.deepseek.com`），自定义 Endpoint 需对方允许 CORS。
 - **IndexedDB 版本升级**：改 `db.js` 的 store 结构时递增 `indexedDB.open(DB_NAME, N)` 的版本号，并在 `onupgradeneeded` 中迁移；用户已有数据不可丢。
 - **TXT 单章节陷阱**：`library.js` 把 TXT 封装为单个 spine item，导致"提炼本章骨架"会拿到整本书。当前 `skills.js` 有 8000 字截断兜底；未来"全书提取"必须按块切分（见项目规划报告）。
@@ -57,6 +59,7 @@ docs/                # 报告、快照、归档
 1. `node --check` 所有改动的 JS 文件（本项目是浏览器代码，node 只做语法检查）。
 2. Chrome `chrome://extensions` → 开发者模式 → 重新加载扩展。
 3. 手动冒烟：导入一本 EPUB + 一本 GBK 编码 TXT → 打开阅读 → 翻页/断点续传 → 目录跳转 → 四个 AI 技能各点一次 → 自由提问（确认 AI 能看到当前页）→ 收藏/删除知识晶体 → 删除书籍 → 关闭书籍按钮。
+4. 提取管线冒烟：打开一本多章节 EPUB → 点"一键提取全书框架" → 观察进度与结果 → 复制/下载 Markdown → 关闭重开再次提取（应命中缓存）→ 点"重新提取"（应强制重跑）→ 提取中取消 → 删除书籍（缓存应级联清除）。
 4. 修改存储逻辑后：确认旧书与新书进度互不干扰，书名为 `apikey.epub` 时配置不被破坏。
 5. 修改 AI 链路后：确认聊天气泡无原始 HTML 注入（可在 API 返回中故意含 `<img onerror>` 验证）。
 

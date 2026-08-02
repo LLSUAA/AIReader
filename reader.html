@@ -72,6 +72,9 @@
           </svg>
           沙盘推演测验
         </button>
+        <button class="ai-btn extract-btn" id="btn-extract">
+          📖 一键提取全书框架
+        </button>
       </div>
 
       <div class="chat-container" id="chat-container">
@@ -92,12 +95,39 @@
 
   </div>
 
+  <!-- ====== 全书框架提取弹窗 ====== -->
+  <div class="extract-modal" id="extract-modal">
+    <div class="extract-modal-content">
+      <div class="extract-modal-header">
+        <span class="extract-modal-title">📖 一键提取全书框架</span>
+        <button class="extract-close" id="extract-close" title="关闭">×</button>
+      </div>
+      <div class="extract-body">
+        <div class="extract-progress-wrap" id="extract-progress-wrap">
+          <div class="extract-progress-bar">
+            <div class="extract-progress-fill" id="extract-progress-fill"></div>
+          </div>
+          <div class="extract-progress-text" id="extract-progress-text">准备中...</div>
+        </div>
+        <div class="extract-status" id="extract-status"></div>
+        <div class="extract-result" id="extract-result"></div>
+        <div class="extract-actions" id="extract-actions">
+          <button class="btn-extract-action primary" id="extract-copy">📋 复制 Markdown</button>
+          <button class="btn-extract-action" id="extract-download">⬇️ 下载 .md</button>
+          <button class="btn-extract-action" id="extract-again">🔄 重新提取</button>
+        </div>
+        <button class="extract-cancel" id="extract-cancel">取消提取</button>
+      </div>
+    </div>
+  </div>
+
   <script src="epub.min.js"></script>
   
   <script src="marked.min.js"></script>
   <script src="skills/markdown.js"></script>
   <script src="skills/db.js"></script>
   <script src="skills/api.js"></script>
+  <script src="skills/extract.js"></script>
   <script src="skills/skills.js"></script>
   
   <script src="skills/reader.js"></script>

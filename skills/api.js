@@ -80,4 +80,54 @@
     }
   };
 
+  // 从模型输出中容错提取 JSON 对象（兼容带代码围栏/前后说明文字的输出）
+  global.extractJSONContent = function(content) {
+    if (!content) throw new Error("模型未返回内容");
+    let text = String(content).trim();
+    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) text = fence[1].trim();
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start === -1 || end <= start) throw new Error("无法从模型输出中解析 JSON");
+    return JSON.parse(text.substring(start, end + 1));
+  };
+
+  // 非流式 JSON 请求：用于全书提取的 Map（逐块摘要）/ Reduce（全局综合）
+  global.requestJSON = async function(messages, model, endpoint, apikey, options) {
+    options = options || {};
+    const maxTokens = options.maxTokens || 2000;
+    const signal = options.signal || undefined;
+    const temperature = typeof options.temperature === "number" ? options.temperature : 0.3;
+
+    const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + apikey };
+    const bodyBase = { model: model, messages: messages, temperature: temperature, max_tokens: maxTokens, stream: false };
+
+    async function doFetch(body) {
+      return fetch(endpoint, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(body),
+        signal: signal
+      });
+    }
+
+    // 优先使用 JSON 输出模式；部分端点/模型不支持 response_format 时回退为普通模式（400/422 均回退）
+    let response = await doFetch(Object.assign({}, bodyBase, { response_format: { type: "json_object" } }));
+    if (response.status === 400 || response.status === 422) {
+      response = await doFetch(bodyBase);
+    }
+    if (!response.ok) {
+      throw new Error("API 错误 (" + response.status + "): " + await response.text());
+    }
+
+    const data = await response.json();
+    const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    return global.extractJSONContent(content);
+  };
+
+  // 粗略 token 估算（中英混排按 2 字符 ≈ 1 token），用于进度与成本提示
+  global.estimateTokens = function(text) {
+    return Math.ceil(String(text || "").length / 2);
+  };
+
 })(window);
