@@ -43,6 +43,7 @@
 - 修复 JSON 解析 "Unterminated string" 报错：模型把裸换行/回车/Tab 写进字符串值时自动转义。
 - 修复 JSON 解析 "Expected property name" 报错：模型输出未加引号的键（如 `{title: "x"}`）时自动补引号。
 - 修复嵌套 JSON 解包失败导致"格式问题"复现：解包改用容错解析（尾逗号/缺失逗号/字符串换行全部兼容）。
+- 新增 `salvageFrameworkMarkdown()` 最后一道保险：即使整体 JSON 无法解析（含转义引号、尾随垃圾），也能正则提取 `framework_markdown` 字段值并解码，杜绝原始 JSON 显示。
 - 修复失败分块以占位章节混入章节骨架的问题：失败块不再进入 Reduce 综合，改为在溯源说明中注明未能提取的块。
 - 提取管线 max_tokens 上调（Map 4000 / Reduce 8000），兼容思维链型模型。
 

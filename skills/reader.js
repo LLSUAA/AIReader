@@ -500,6 +500,11 @@
     markdown = typeof window.normalizeFrameworkMarkdown === "function"
       ? window.normalizeFrameworkMarkdown(markdown)
       : String(markdown || "");
+    // 最后一道保险：normalize 后仍以 { 开头（整体 JSON 无法解析），用正则兜底提取
+    if (String(markdown).trim().indexOf("{") === 0 && typeof window.salvageFrameworkMarkdown === "function") {
+      const salvaged = window.salvageFrameworkMarkdown(markdown);
+      if (salvaged) markdown = salvaged;
+    }
     if (!markdown) {
       if (extractProgressText) extractProgressText.textContent = "❌ 模型返回的框架内容无效";
       if (extractCancel) extractCancel.style.display = "inline-block";

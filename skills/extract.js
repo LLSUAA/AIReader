@@ -250,9 +250,54 @@ ${JSON.stringify(summaries)}`;
         // 用容错解析（含尾逗号/缺失逗号/字符串内换行修复），嵌套 JSON 也能解包
         const parsed = global.extractJSONContent(text);
         if (parsed && typeof parsed === "object") return global.normalizeFrameworkMarkdown(parsed);
-      } catch (e) { /* 不是 JSON，按原文处理 */ }
+      } catch (e) { /* 尝试正则兜底 */ }
+      // 最后一道保险：正则提取 framework_markdown 字段值（兼容转义引号与 \n 序列）
+      const salvaged = global.salvageFrameworkMarkdown(text);
+      if (salvaged) return salvaged;
     }
     return text;
+  };
+
+  // 正则兜底：无论 JSON 整体是否合法，直接抓取 framework_markdown 的字符串值并解码转义
+  global.salvageFrameworkMarkdown = function (text) {
+    const source = String(text || "");
+    const idx = source.indexOf("framework_markdown");
+    if (idx === -1) return "";
+    const colon = source.indexOf(":", idx);
+    if (colon === -1) return "";
+    const startQuote = source.indexOf('"', colon);
+    if (startQuote === -1) return "";
+    let out = "";
+    let i = startQuote + 1;
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === "\\" && i + 1 < source.length) {
+        const next = source[i + 1];
+        if (next === "n") out += "\n";
+        else if (next === "r") out += "\r";
+        else if (next === "t") out += "\t";
+        else if (next === '"') out += '"';
+        else if (next === "\\") out += "\\";
+        else if (next === "/") out += "/";
+        else if (next === "u") {
+          const hex = source.substr(i + 2, 4);
+          if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+            out += String.fromCharCode(parseInt(hex, 16));
+            i += 5;
+          } else {
+            out += next;
+          }
+        } else {
+          out += next;
+        }
+        i += 2;
+        continue;
+      }
+      if (ch === '"') break;
+      out += ch;
+      i++;
+    }
+    return out.trim();
   };
 
   // ---------- 调度器 ----------
