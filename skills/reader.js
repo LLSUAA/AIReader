@@ -404,6 +404,7 @@
   const extractActions = document.getElementById("extract-actions");
   const extractCancel = document.getElementById("extract-cancel");
   let extractMarkdownCache = "";
+  let extractAnchors = [];
   let extractRunning = false;
   let extractTimerId = null;
   let extractStartTime = 0;
@@ -459,6 +460,7 @@
 
   function resetExtractUI() {
     extractMarkdownCache = "";
+    extractAnchors = [];
     stopExtractTimer();
     extractStartTime = 0;
     setExtractTimerText(0);
@@ -533,7 +535,8 @@
     lines.push("generated: " + new Date().toISOString().slice(0, 10));
     lines.push("---");
     lines.push("");
-    lines.push(extractMarkdownCache);
+    // 导出去掉 aireader-cfi 内部链接（Obsidian 无法使用），保留"↩ 原文"文字标记
+    lines.push(extractMarkdownCache.replace(/\[([^\]]*)\]\(aireader-cfi:[^)]*\)/g, "$1"));
     return lines.join("\n");
   }
 
@@ -560,6 +563,7 @@
             ? window.normalizeFrameworkMarkdown(cached.result_markdown)
             : cached.result_markdown;
           if (md) {
+            extractAnchors = Array.isArray(cached.anchors) ? cached.anchors : [];
             showExtractResult(md, true);
             // 旧缓存可能是嵌套 JSON，顺手纠正，避免再次导出脏数据
             if (md !== cached.result_markdown) {
@@ -613,11 +617,13 @@
         ? window.normalizeFrameworkMarkdown(outcome.result && outcome.result.framework_markdown)
         : ((outcome.result && outcome.result.framework_markdown) || "");
       if (!markdown) throw new Error("模型未返回有效的框架内容");
+      extractAnchors = Array.isArray(outcome.anchors) ? outcome.anchors : [];
       await window.saveExtraction({
         bookName: currentBookMeta,
         status: "done",
         book_summary: outcome.result.book_summary || "",
         result_markdown: markdown,
+        anchors: extractAnchors,
         chunkCount: outcome.chunkCount,
         updatedAt: Date.now()
       });
@@ -808,6 +814,22 @@
   if (extractDownloadBtn) extractDownloadBtn.addEventListener("click", downloadExtractMarkdown);
   const extractAgainBtn = document.getElementById("extract-again");
   if (extractAgainBtn) extractAgainBtn.addEventListener("click", function () { runExtraction(true); });
+  // 溯源跳转：点击骨架中的"↩ 原文"回到书籍对应章节
+  if (extractResult) {
+    extractResult.addEventListener("click", function (e) {
+      const link = e.target && e.target.closest ? e.target.closest('a[href^="aireader-cfi:"]') : null;
+      if (!link) return;
+      e.preventDefault();
+      const idx = parseInt(link.getAttribute("href").slice("aireader-cfi:".length), 10);
+      const anchor = extractAnchors[idx];
+      if (anchor && anchor.cfi && rendition) {
+        rendition.display(anchor.cfi).catch(function (err) {
+          console.error("CFI 跳转失败:", err);
+        });
+        closeExtractModal();
+      }
+    });
+  }
   // 发送按钮事件
   document.getElementById("btn-send").addEventListener("click", handleUserInput);
 

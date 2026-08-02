@@ -19,29 +19,55 @@
   };
 
   // ---------- 第一层：结构解析 ----------
-  // EPUB 按 spine item（通常=章节）切分；超长单章节（如 TXT 转换书）再按段落簇切分
-  function splitLongText(text, label, chunks) {
-    const paragraphs = text.split(/\n+/).map(s => s.trim()).filter(s => s.length > 0);
-    if (paragraphs.length <= 1) {
-      chunks.push({ label: label, text: text.substring(0, CHUNK_CHARS) });
-      return;
-    }
+  // EPUB 按 spine item（通常=章节）切分；超长章节再按 DOM 段落簇切分（保留锚点）
+  function extractParagraphs(body) {
+    const out = [];
+    if (!body) return out;
+    try {
+      const els = body.querySelectorAll
+        ? Array.prototype.slice.call(body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"))
+        : [];
+      for (const el of els) {
+        const t = (el.textContent || "").trim();
+        if (t) out.push({ el: el, text: t });
+      }
+    } catch (e) { /* 无 DOM 时回退为整块 */ }
+    return out;
+  }
+
+  function chunkParagraphs(paragraphs, label, chunks) {
     let current = [];
     let currentLen = 0;
     let part = 0;
-    for (const p of paragraphs) {
-      if (currentLen + p.length > CHUNK_CHARS && current.length) {
-        part++;
-        chunks.push({ label: label + (part > 1 ? "（第" + part + "部分）" : ""), text: current.join("\n\n") });
-        current = [];
-        currentLen = 0;
-      }
-      current.push(p);
-      currentLen += p.length;
-    }
-    if (current.length) {
+    const pushCurrent = function () {
+      if (!current.length) return;
       part++;
-      chunks.push({ label: label + (part > 1 ? "（第" + part + "部分）" : ""), text: current.join("\n\n") });
+      chunks.push({
+        label: label + (part > 1 ? "（第" + part + "部分）" : ""),
+        text: current.map(p => p.text).join("\n\n"),
+        paras: current.slice()
+      });
+      current = [];
+      currentLen = 0;
+    };
+    for (const p of paragraphs) {
+      if (currentLen + p.text.length > CHUNK_CHARS && current.length) pushCurrent();
+      current.push(p);
+      currentLen += p.text.length;
+    }
+    pushCurrent();
+  }
+
+  // 生成书级绝对 CFI（章节起始位置），用于溯源跳转
+  function computeCfiForElement(doc, el, base) {
+    try {
+      if (typeof ePub === "undefined" || !ePub.CFI || !doc || !el) return "";
+      const range = doc.createRange();
+      range.setStart(el, 0);
+      range.collapse(true);
+      return new ePub.CFI().fromRange(range, base || "").toString();
+    } catch (e) {
+      return "";
     }
   }
 
@@ -68,10 +94,19 @@
           }
         } catch (e) { /* 无标题元素则退回序号 */ }
         const label = title ? title : "第" + (i + 1) + "节";
-        if (text.length <= CHUNK_CHARS) {
-          chunks.push({ label: label, text: text });
+        const base = (item.section && item.section.cfiBase) || "";
+        const paragraphs = extractParagraphs(doc.body);
+        const made = [];
+        if (paragraphs.length) {
+          chunkParagraphs(paragraphs, label, made);
         } else {
-          splitLongText(text, label, chunks);
+          made.push({ label: label, text: text, paras: [] });
+        }
+        for (const c of made) {
+          const anchorEl = (c.paras && c.paras.length) ? c.paras[0].el : doc.body;
+          const cfi = computeCfiForElement(doc, anchorEl, base);
+          // 清除 DOM 引用（不进入提示词/日志），只保留文本与 CFI
+          chunks.push({ label: c.label, text: c.text, cfi: cfi || "" });
         }
       } catch (e) {
         // 单个章节加载失败不阻塞整本书
@@ -178,14 +213,18 @@ ${chunk.text}`;
     const isFailed = function (r) {
       return !!(r.core_points && r.core_points[0] && r.core_points[0].indexOf("该块提取失败") !== -1);
     };
-    const usable = results.filter(function (r) { return !isFailed(r); });
-    const summaries = usable.map(r => ({
-      chapter: r.chapter,
-      core_points: r.core_points,
-      concepts: r.concepts,
-      relation_to_prev: r.relation_to_prev,
-      confidence: r.confidence
-    }));
+    const summaries = [];
+    results.forEach(function (r, idx) {
+      if (isFailed(r)) return;
+      summaries.push({
+        chunk_index: idx,
+        chapter: r.chapter,
+        core_points: r.core_points,
+        concepts: r.concepts,
+        relation_to_prev: r.relation_to_prev,
+        confidence: r.confidence
+      });
+    });
     const failedNote = (failedLabels && failedLabels.length)
       ? "\n\n注意：本次有 " + failedLabels.length + " 个分块提取失败（" + failedLabels.join("；") + "）。这些块的内容不可用，禁止虚构；请在框架的溯源说明中注明这些块未能提取。"
       : "";
@@ -211,6 +250,7 @@ ${chunk.text}`;
 4. 章节骨架中每一章的标题必须使用摘要提供的原文章节名，禁止自拟、合并或改名；摘要中出现的所有章节都必须覆盖，每章至少一条要点。
 5. 涉及具体数字（层数、占比、概率、年份）时必须与摘要完全一致，禁止改写。
 6. Mermaid 中同一概念只能出现一个节点，禁止重复命名。
+7. 骨架中每条以 - 开头的要点末尾必须标注其来源分块编号【C编号】，编号只能是本摘要中出现的 chunk_index；综合多个分块时标注最相关的一个；禁止编造编号。
 
 ${failedNote}
 
@@ -298,6 +338,39 @@ ${JSON.stringify(summaries)}`;
       i++;
     }
     return out.trim();
+  };
+
+  // 溯源锚点注入：把骨架里的【C编号】标记替换为可点击的 aireader-cfi 链接；
+  // 若模型未标编号，则按章节标题匹配分块，给标题挂锚点
+  global.applyFrameworkAnchors = function (markdown, chunks) {
+    if (!markdown || !chunks || !chunks.length) {
+      return { markdown: String(markdown || ""), anchoredCount: 0 };
+    }
+    let out = String(markdown);
+    let count = 0;
+    out = out.replace(/【\s*C(\d+)\s*】/g, function (m, idxStr) {
+      const idx = parseInt(idxStr, 10);
+      if (chunks[idx] && chunks[idx].cfi) {
+        count++;
+        return " [↩ 原文](aireader-cfi:" + idx + ")";
+      }
+      return "";
+    });
+    if (count === 0) {
+      const byLabel = {};
+      chunks.forEach(function (c, idx) {
+        if (c.cfi && byLabel[c.label] === undefined) byLabel[c.label] = idx;
+      });
+      out = out.replace(/^(#{2,3})\s+(.+?)\s*$/gm, function (line, hashes, title) {
+        const key = title.trim();
+        if (byLabel[key] !== undefined) {
+          count++;
+          return line + " [↩ 原文](aireader-cfi:" + byLabel[key] + ")";
+        }
+        return line;
+      });
+    }
+    return { markdown: out, anchoredCount: count };
   };
 
   // ---------- 调度器 ----------
@@ -425,7 +498,18 @@ ${JSON.stringify(summaries)}`;
       reduceResult = { book_summary: "", framework_markdown: md };
     }
 
+    // 溯源锚点注入：骨架条目可点击跳回原文
+    let anchoredCount = 0;
+    if (reduceResult && reduceResult.framework_markdown) {
+      const anchored = global.applyFrameworkAnchors(reduceResult.framework_markdown, chunks);
+      reduceResult.framework_markdown = anchored.markdown;
+      anchoredCount = anchored.anchoredCount;
+    }
+    const anchors = chunks.map(function (c) {
+      return c.cfi ? { label: c.label, cfi: c.cfi } : null;
+    });
+
     activeAbort = null;
-    return { cancelled: false, chunkCount: chunks.length, result: reduceResult };
+    return { cancelled: false, chunkCount: chunks.length, result: reduceResult, anchors: anchors, anchoredCount: anchoredCount };
   };
 })(window);

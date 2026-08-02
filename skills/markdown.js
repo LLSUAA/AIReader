@@ -28,7 +28,8 @@
     var origLink = renderer.link;
     renderer.link = function (href, title, text) {
       var safeHref = href || "";
-      if (!/^(https?:|mailto:)/i.test(safeHref)) safeHref = "#";
+      // aireader-cfi 是站内溯源跳转协议（弹窗点击跳回原文），其余未知协议一律拦截
+      if (!/^(https?:|mailto:|aireader-cfi:)/i.test(safeHref)) safeHref = "#";
       var out = origLink.call(renderer, safeHref, title, text);
       return out.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer nofollow" ');
     };

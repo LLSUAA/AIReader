@@ -54,6 +54,7 @@ docs/                # 报告、快照、归档
 - **JSON 模式兼容性**：`requestJSON()` 优先用 `response_format`，遇到 400/422 或空内容会自动回退普通模式重试；`extractJSONContent()` 会容错修复尾逗号并兼容顶层数组。Reduce 阶段开启 `fallbackRaw`：模型未按 JSON 输出时，直接把其 Markdown 输出作为框架内容（从第一个标题起截取）。模型还可能把 `framework_markdown` 嵌套成 JSON 字符串，展示/导出前必须经过 `normalizeFrameworkMarkdown()` 解包。
 - **reasoning 模型**：思维链 token 计入 `max_tokens` 且经常把 content 挤空。提取管线在同一模型上最多试 2 档（Map 4000/8000，Reduce 8000），仍失败自动改用 `deepseek-chat` 重试（`buildMapAttempts` / `buildReduceAttempts`）。不要改回长 token 死磕策略。
 - **提取速度与续传**：Map 默认并发 3（`CONCURRENCY`）；每块完成通过 `onChunkDone` 落盘到 `extractions` store（status: running + chunks 数组），下次提取自动 `resume` 跳过已完成块；成功后写 done 记录。并发上限、续传键名改动需同步 reader.js 与 db.js。
+- **CFI 溯源锚点**：`buildBookChunks()` 按 DOM 段落（p/h1-h6/li/blockquote/pre）切块，用 `item.section.cfiBase` + `ePub.CFI.fromRange()` 生成书级绝对 CFI；Reduce 要求每条骨架要点标注来源分块【C编号】，`applyFrameworkAnchors()` 负责把标记替换为 `aireader-cfi:<chunkIndex>` 链接（无标记时按章节标题兜底）。`reader.js` 拦截该协议链接调用 `rendition.display(cfi)` 跳转；导出时链接被剥离为纯文字。锚点随提取结果存 `extractions.anchors`，改切分逻辑必须同步锚点生成与缓存结构。
 - **提取弹窗防误关**：弹窗外点击不会关闭窗口（防误触中止提取）；关闭必须走 × /「取消提取」，提取中会弹确认框。
 - **MV3 CSP**：扩展页禁止内联 `<script>`（event handler 属性也不可用）；跨域 fetch 需要 `host_permissions`（目前声明了 `api.deepseek.com`），自定义 Endpoint 需对方允许 CORS。
 - **IndexedDB 版本升级**：改 `db.js` 的 store 结构时递增 `indexedDB.open(DB_NAME, N)` 的版本号，并在 `onupgradeneeded` 中迁移；用户已有数据不可丢。
