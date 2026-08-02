@@ -546,6 +546,7 @@
   }
 
   async function runExtraction(force) {
+    if (extractRunning) return; // 防连点：已有提取进行中直接忽略
     if (!book || !currentBookMeta) { alert("请先打开一本书。"); return; }
     let config;
     try { config = await chrome.storage.local.get(["apikey", "endpoint", "model"]); } catch (e) { alert("读取配置失败：" + e.message); return; }
@@ -636,7 +637,13 @@
       finishExtractRun();
     } catch (e) {
       console.error("全书提取失败:", e);
-      if (extractProgressText) extractProgressText.textContent = "❌ 提取失败：" + e.message;
+      // 用户取消/请求中止：显示"已取消"，不当作失败
+      const isAbort = !!(e && (e.name === "AbortError" ||
+        (typeof DOMException !== "undefined" && e instanceof DOMException) ||
+        /aborted|The user aborted/i.test(String(e.message || ""))));
+      if (extractProgressText) {
+        extractProgressText.textContent = isAbort ? "已取消提取" : "❌ 提取失败：" + e.message;
+      }
       if (extractCancel) extractCancel.style.display = "inline-block";
       finishExtractRun();
     }
@@ -861,16 +868,7 @@
           return false;
         };
 
-        if (anchor.cfi) {
-          rendition.display(anchor.cfi).catch(function (err) {
-            console.error("CFI 跳转失败，回退到章节:", err);
-            if (anchor.href) {
-              rendition.display(anchor.href).catch(function (e2) {
-                console.error("章节回退失败:", e2);
-              });
-            }
-          });
-        } else if (anchor.startText && anchor.href) {
+        if (anchor.startText && anchor.href) {
           // 先加载章节，再在渲染后的文档中定位段落
           rendition.display(anchor.href).then(function () {
             locateInContents(anchor.startText);
@@ -880,6 +878,16 @@
         } else if (anchor.href) {
           rendition.display(anchor.href).catch(function (err) {
             console.error("章节跳转失败:", err);
+          });
+        } else if (anchor.cfi) {
+          // 旧缓存兼容：只有 CFI 没有 startText 时使用
+          rendition.display(anchor.cfi).catch(function (err) {
+            console.error("CFI 跳转失败，回退到章节:", err);
+            if (anchor.href) {
+              rendition.display(anchor.href).catch(function (e2) {
+                console.error("章节回退失败:", e2);
+              });
+            }
           });
         } else {
           return;

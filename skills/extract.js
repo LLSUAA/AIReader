@@ -391,6 +391,7 @@ ${JSON.stringify(summaries)}`;
       activeAbort = null;
       throw new Error("未能从本书提取到任何文本，请确认文件内容可读。");
     }
+    if (aborter.signal.aborted) return { cancelled: true };
 
     // Map 阶段：并发工作池（默认 3），支持断点续传（resume）与逐块落盘（onChunkDone）
     const results = new Array(chunks.length).fill(null);
