@@ -51,7 +51,7 @@ docs/                # 报告、快照、归档
 - **epub.js 0.3**：目录用 `book.loaded.navigation`（Promise → `{ toc: [...] }`）；翻页/定位用 `rendition.currentLocation().start.index` 与 CFI。TOC 条目结构 `{ href, label, subitems }`。
 - **epub.js 依赖 JSZip**：`epub.min.js` 在加载时即读取 `window.JSZip`，运行时解包 EPUB 也需要它。`reader.html` 与 `library.html` 都必须在 `epub.min.js` 之前加载 `jszip.min.js`，**不要误删**（2026-08-02 曾因此踩坑）。
 - **全书提取管线**：`skills/extract.js` 是"一键提取全书框架"的唯一入口。Map 阶段输出固定 JSON schema（title/core_points/concepts/relation_to_prev/confidence），Reduce 阶段输出 `{ book_summary, framework_markdown }`。结果缓存在 IndexedDB `extractions` store（keyPath: bookName），改 schema 时必须同步升级缓存结构（db 版本 v3）。
-- **JSON 模式兼容性**：`requestJSON()` 优先用 `response_format`，遇到 400/422 或空内容会自动回退普通模式重试；`extractJSONContent()` 会容错修复模型输出的尾逗号。若模型是 reasoning 类（思维链），其 token 计入 `max_tokens`，Map/Reduce 已上调至 4000/8000，仍不足时需换模型。
+- **JSON 模式兼容性**：`requestJSON()` 优先用 `response_format`，遇到 400/422 或空内容会自动回退普通模式重试；`extractJSONContent()` 会容错修复尾逗号并兼容顶层数组。Reduce 阶段开启 `fallbackRaw`：模型未按 JSON 输出时，直接把其 Markdown 输出作为框架内容（从第一个标题起截取）。若模型是 reasoning 类（思维链），其 token 计入 `max_tokens`，Map/Reduce 已上调至 4000/8000，仍不足时需换模型。
 - **MV3 CSP**：扩展页禁止内联 `<script>`（event handler 属性也不可用）；跨域 fetch 需要 `host_permissions`（目前声明了 `api.deepseek.com`），自定义 Endpoint 需对方允许 CORS。
 - **IndexedDB 版本升级**：改 `db.js` 的 store 结构时递增 `indexedDB.open(DB_NAME, N)` 的版本号，并在 `onupgradeneeded` 中迁移；用户已有数据不可丢。
 - **TXT 单章节陷阱**：`library.js` 把 TXT 封装为单个 spine item，导致"提炼本章骨架"会拿到整本书。当前 `skills.js` 有 8000 字截断兜底；未来"全书提取"必须按块切分（见项目规划报告）。

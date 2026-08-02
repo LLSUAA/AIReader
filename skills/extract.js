@@ -148,6 +148,22 @@ ${chunk.text}`;
 ${JSON.stringify(summaries)}`;
   }
 
+  // 降级：模型未按 JSON 输出时，把原始 Markdown 作为框架内容使用
+  function rawToMarkdown(text) {
+    const raw = String(text || "").replace(/^\uFEFF/, "").trim();
+    if (!raw) return "";
+    // 跳过模型常见的"好的，以下是..."式前言，从第一个 Markdown 标题开始
+    const lines = raw.split(/\r?\n/);
+    let start = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^#{1,6}\s/.test(lines[i])) {
+        start = i;
+        break;
+      }
+    }
+    return lines.slice(start).join("\n").trim();
+  }
+
   // ---------- 调度器 ----------
   global.extractBookFramework = async function (book, options) {
     options = options || {};
@@ -223,11 +239,18 @@ ${JSON.stringify(summaries)}`;
         options.model,
         options.endpoint,
         options.apikey,
-        { maxTokens: 8000, signal: aborter.signal, temperature: 0.3 }
+        { maxTokens: 8000, signal: aborter.signal, temperature: 0.3, fallbackRaw: true }
       );
     } catch (e) {
       if (aborter.signal.aborted) return { cancelled: true };
       throw e;
+    }
+
+    // JSON 解析失败降级：直接用模型输出的 Markdown
+    if (reduceResult && reduceResult.__raw) {
+      const md = rawToMarkdown(reduceResult.__raw);
+      if (!md) throw new Error("模型未返回有效的框架内容");
+      reduceResult = { book_summary: "", framework_markdown: md };
     }
 
     activeAbort = null;

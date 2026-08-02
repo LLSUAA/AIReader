@@ -24,6 +24,7 @@
 - 修复 1.1.0 中误移除 reader.html 的 JSZip 依赖导致 EPUB 打开报错 "JSZip lib not loaded" 的问题（epub.js 在加载与运行时解包均依赖 JSZip）。
 - 修复提取管线"模型未返回内容"：请求失败/空内容时自动回退普通模式重试；reasoning 类模型思维链耗尽 max_tokens 时给出明确提示。
 - 修复模型输出 JSON 尾逗号导致解析失败的问题（自动容错修复）。
+- 修复最后一步 Reduce 失败：模型未按 JSON 输出时自动降级，把其 Markdown 输出直接作为全书框架；JSON 解析兼容顶层数组。
 - 提取管线 max_tokens 上调（Map 4000 / Reduce 8000），兼容思维链型模型。
 
 ## [1.0.1] - 2026-08-02

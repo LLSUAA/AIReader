@@ -80,7 +80,7 @@
     }
   };
 
-  // 从模型输出中容错提取 JSON 对象（兼容带代码围栏/前后说明文字的输出）
+  // 从模型输出中容错提取 JSON 对象（兼容代码围栏/前后说明文字/尾逗号/顶层数组）
   global.extractJSONContent = function(content) {
     if (!content) throw new Error("模型未返回内容");
     let text = String(content).replace(/^\uFEFF/, "").trim();
@@ -90,8 +90,17 @@
     text = text.replace(/,\s*([}\]])/g, "$1");
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
-    if (start === -1 || end <= start) throw new Error("无法从模型输出中解析 JSON");
-    return JSON.parse(text.substring(start, end + 1));
+    if (start !== -1 && end > start) {
+      return JSON.parse(text.substring(start, end + 1));
+    }
+    // 顶层数组兜底：部分模型会把"JSON 数组"理解成输出数组
+    const arrStart = text.indexOf("[");
+    const arrEnd = text.lastIndexOf("]");
+    if (arrStart !== -1 && arrEnd > arrStart) {
+      const arr = JSON.parse(text.substring(arrStart, arrEnd + 1));
+      if (Array.isArray(arr) && arr.length) return arr[0];
+    }
+    throw new Error("无法从模型输出中解析 JSON");
   };
 
   // 兼容不同厂商的 content 结构：字符串 / 分块数组 / 缺失
@@ -113,6 +122,7 @@
     const maxTokens = options.maxTokens || 2000;
     const signal = options.signal || undefined;
     const temperature = typeof options.temperature === "number" ? options.temperature : 0.3;
+    const fallbackRaw = !!options.fallbackRaw;
 
     const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + apikey };
     const bodyBase = { model: model, messages: messages, temperature: temperature, max_tokens: maxTokens, stream: false };
@@ -147,7 +157,16 @@
       const message = data.choices && data.choices[0] && data.choices[0].message;
       const content = getMessageContent(message);
       if (content && content.trim()) {
-        return global.extractJSONContent(content);
+        try {
+          return global.extractJSONContent(content);
+        } catch (e) {
+          if (fallbackRaw) {
+            // 降级模式：解析失败时把原始输出原样带回，由调用方决定如何使用
+            return { __raw: content };
+          }
+          e.rawContent = content;
+          throw e;
+        }
       }
       const hasReasoning = message && message.reasoning_content;
       lastError = new Error(
