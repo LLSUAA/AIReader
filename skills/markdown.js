@@ -18,23 +18,48 @@
   // 安全渲染：丢弃原始 HTML 块，仅以转义文本呈现；外链加 noopener/noreferrer/nofollow
   global.renderMarkdown = function (text) {
     if (typeof marked === "undefined") return text;
+    try {
+      var renderer = new marked.Renderer();
+      renderer.html = function (token) {
+        var raw = typeof token === "string" ? token : (token && token.text) || "";
+        return escapeHtml(raw);
+      };
 
-    var renderer = new marked.Renderer();
-    renderer.html = function (token) {
-      var raw = typeof token === "string" ? token : (token && token.text) || "";
-      return escapeHtml(raw);
-    };
+      renderer.link = function (href, title, text) {
+        // marked v15 传 token 对象（{href,title,tokens}），旧版传三个位置参数
+        var safeHref = "";
+        var safeTitle = "";
+        var linkText = "";
+        var tokens = null;
+        if (href && typeof href === "object") {
+          safeHref = href.href || "";
+          safeTitle = href.title || "";
+          linkText = href.text || "";
+          tokens = href.tokens || null;
+        } else {
+          safeHref = href || "";
+          safeTitle = title || "";
+          linkText = text || "";
+        }
+        // aireader-cfi 是站内溯源跳转协议（弹窗点击跳回原文），其余未知协议一律拦截
+        if (!/^(https?:|mailto:|aireader-cfi:)/i.test(safeHref)) safeHref = "#";
+        var inner = escapeHtml(linkText);
+        if (tokens && this.parser && typeof this.parser.parseInline === "function") {
+          try {
+            inner = this.parser.parseInline(tokens);
+          } catch (e) { /* 内联解析失败退回纯文本 */ }
+        }
+        return '<a href="' + escapeHtml(safeHref) + '"' +
+          (safeTitle ? ' title="' + escapeHtml(safeTitle) + '"' : "") +
+          ' target="_blank" rel="noopener noreferrer nofollow">' + inner + "</a>";
+      };
 
-    var origLink = renderer.link;
-    renderer.link = function (href, title, text) {
-      var safeHref = href || "";
-      // aireader-cfi 是站内溯源跳转协议（弹窗点击跳回原文），其余未知协议一律拦截
-      if (!/^(https?:|mailto:|aireader-cfi:)/i.test(safeHref)) safeHref = "#";
-      var out = origLink.call(renderer, safeHref, title, text);
-      return out.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer nofollow" ');
-    };
-
-    marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
-    return marked.parse(text || "");
+      marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
+      return marked.parse(text || "");
+    } catch (e) {
+      // 渲染器异常时降级为纯文本，绝不阻断展示流程
+      console.error("Markdown 渲染失败，降级为纯文本:", e);
+      return escapeHtml(String(text || ""));
+    }
   };
 })(window);

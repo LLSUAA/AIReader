@@ -521,7 +521,12 @@
     }
     if (extractResult) {
       extractResult.style.display = "block";
-      extractResult.innerHTML = typeof window.renderMarkdown === "function" ? window.renderMarkdown(markdown) : markdown;
+      try {
+        extractResult.innerHTML = typeof window.renderMarkdown === "function" ? window.renderMarkdown(markdown) : markdown;
+      } catch (e) {
+        console.error("结果渲染失败，降级为纯文本:", e);
+        extractResult.textContent = markdown;
+      }
     }
     if (extractActions) extractActions.style.display = "flex";
   }

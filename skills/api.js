@@ -164,16 +164,30 @@
     const signal = options.signal || undefined;
     const temperature = typeof options.temperature === "number" ? options.temperature : 0.3;
     const fallbackRaw = !!options.fallbackRaw;
+    const timeoutMs = options.timeoutMs || 120000;
 
     const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + apikey };
     const bodyBase = { model: model, messages: messages, temperature: temperature, max_tokens: maxTokens, stream: false };
+
+    // 请求超时：防止 API 挂起导致提取界面无限等待
+    let timedOut = false;
+    const innerController = new AbortController();
+    const onOuterAbort = function () { innerController.abort(); };
+    if (signal) {
+      if (signal.aborted) innerController.abort();
+      else signal.addEventListener("abort", onOuterAbort);
+    }
+    const timer = setTimeout(function () {
+      timedOut = true;
+      innerController.abort();
+    }, timeoutMs);
 
     async function doFetch(body) {
       return fetch(endpoint, {
         method: "POST",
         headers: headers,
         body: JSON.stringify(body),
-        signal: signal
+        signal: innerController.signal
       });
     }
 
@@ -184,41 +198,52 @@
       Object.assign({}, bodyBase, { response_format: { type: "json_object" } }),
       bodyBase
     ];
-    let lastError = null;
-    for (let i = 0; i < attempts.length; i++) {
-      const response = await doFetch(attempts[i]);
-      if (response.status === 400 || response.status === 422) {
-        lastError = new Error("API 错误 (" + response.status + "): " + await response.text());
-        continue;
-      }
-      if (!response.ok) {
-        throw new Error("API 错误 (" + response.status + "): " + await response.text());
-      }
-      const data = await response.json();
-      const message = data.choices && data.choices[0] && data.choices[0].message;
-      const content = getMessageContent(message);
-      if (content && content.trim()) {
+    try {
+      let lastError = null;
+      for (let i = 0; i < attempts.length; i++) {
+        let response;
         try {
-          return global.extractJSONContent(content);
-        } catch (e) {
-          if (fallbackRaw) {
-            // 降级模式：解析失败时把原始输出原样带回，由调用方决定如何使用
-            return { __raw: content };
-          }
-          e.rawContent = content;
-          throw e;
+          response = await doFetch(attempts[i]);
+        } catch (err) {
+          if (timedOut) throw new Error("请求超时（超过 " + Math.round(timeoutMs / 1000) + " 秒），请重试或更换模型");
+          throw err;
         }
+        if (response.status === 400 || response.status === 422) {
+          lastError = new Error("API 错误 (" + response.status + "): " + await response.text());
+          continue;
+        }
+        if (!response.ok) {
+          throw new Error("API 错误 (" + response.status + "): " + await response.text());
+        }
+        const data = await response.json();
+        const message = data.choices && data.choices[0] && data.choices[0].message;
+        const content = getMessageContent(message);
+        if (content && content.trim()) {
+          try {
+            return global.extractJSONContent(content);
+          } catch (e) {
+            if (fallbackRaw) {
+              // 降级模式：解析失败时把原始输出原样带回，由调用方决定如何使用
+              return { __raw: content };
+            }
+            e.rawContent = content;
+            throw e;
+          }
+        }
+        const hasReasoning = message && message.reasoning_content;
+        lastError = new Error(
+          "模型未返回内容" +
+          (hasReasoning
+            ? "（检测到模型把 token 用于思维链，请改用非 reasoning 模型，或调大 max_tokens）"
+            : "（模型 " + model + " 返回空内容，请检查模型名/端点是否正确）")
+        );
+        lastError.reasoning = !!hasReasoning;
       }
-      const hasReasoning = message && message.reasoning_content;
-      lastError = new Error(
-        "模型未返回内容" +
-        (hasReasoning
-          ? "（检测到模型把 token 用于思维链，请改用非 reasoning 模型，或调大 max_tokens）"
-          : "（模型 " + model + " 返回空内容，请检查模型名/端点是否正确）")
-      );
-      lastError.reasoning = !!hasReasoning;
+      throw lastError || new Error("模型未返回内容");
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onOuterAbort);
     }
-    throw lastError || new Error("模型未返回内容");
   };
 
   // 粗略 token 估算（中英混排按 2 字符 ≈ 1 token），用于进度与成本提示
