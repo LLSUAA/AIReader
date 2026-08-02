@@ -863,8 +863,18 @@
                   range.collapse(true);
                   if (contents.cfiFromRange) {
                     const cfi = contents.cfiFromRange(range);
-                    rendition.display(cfi).catch(function (err) {
-                      console.error("段落定位翻页失败:", err);
+                    console.info("[溯源跳转] 生成 CFI:", cfi);
+                    const beforeCfi = rendition.currentLocation() && rendition.currentLocation().start && rendition.currentLocation().start.cfi;
+                    rendition.display(cfi).then(function () {
+                      console.info("[溯源跳转] CFI 翻页完成");
+                      setTimeout(function () {
+                        try {
+                          const after = rendition.currentLocation() && rendition.currentLocation().start;
+                          console.info("[溯源跳转] 翻页后位置:", after && after.cfi, "| 变化:", beforeCfi !== (after && after.cfi));
+                        } catch (e2) { console.error("[溯源跳转] 位置读取失败:", e2); }
+                      }, 600);
+                    }).catch(function (err) {
+                      console.error("[溯源跳转] CFI 翻页失败:", err && err.message, err);
                     });
                   }
                   return true;
