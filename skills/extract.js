@@ -180,7 +180,7 @@ ${JSON.stringify(summaries)}`;
           options.model,
           options.endpoint,
           options.apikey,
-          { maxTokens: 1500, signal: aborter.signal, temperature: 0.2 }
+          { maxTokens: 4000, signal: aborter.signal, temperature: 0.2 }
         );
         results.push(normalizeChunk(data, chunks[i].label));
         options.onProgress && options.onProgress({
@@ -223,7 +223,7 @@ ${JSON.stringify(summaries)}`;
         options.model,
         options.endpoint,
         options.apikey,
-        { maxTokens: 4000, signal: aborter.signal, temperature: 0.3 }
+        { maxTokens: 8000, signal: aborter.signal, temperature: 0.3 }
       );
     } catch (e) {
       if (aborter.signal.aborted) return { cancelled: true };
