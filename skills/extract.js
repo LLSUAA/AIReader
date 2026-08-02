@@ -58,17 +58,9 @@
     pushCurrent();
   }
 
-  // 生成书级绝对 CFI（章节起始位置），用于溯源跳转
-  function computeCfiForElement(doc, el, base) {
-    try {
-      if (typeof ePub === "undefined" || !ePub.CFI || !doc || !el) return "";
-      const range = doc.createRange();
-      range.setStart(el, 0);
-      range.collapse(true);
-      return new ePub.CFI().fromRange(range, base || "").toString();
-    } catch (e) {
-      return "";
-    }
+  // 归一化文本（去空白），用于点击时的段落定位
+  function normalizeText(s) {
+    return String(s || "").replace(/\s+/g, "");
   }
 
   global.buildBookChunks = async function (book) {
@@ -94,8 +86,6 @@
           }
         } catch (e) { /* 无标题元素则退回序号 */ }
         const label = title ? title : "第" + (i + 1) + "节";
-        // cfiBase 直接挂在 spine item 上（如 /6/2），部分封装可能放在 section
-        const base = item.cfiBase || (item.section && item.section.cfiBase) || "";
         const paragraphs = extractParagraphs(doc.body);
         const made = [];
         if (paragraphs.length) {
@@ -104,10 +94,14 @@
           made.push({ label: label, text: text, paras: [] });
         }
         for (const c of made) {
-          const anchorEl = (c.paras && c.paras.length) ? c.paras[0].el : doc.body;
-          const cfi = computeCfiForElement(doc, anchorEl, base);
-          // 清除 DOM 引用（不进入提示词/日志），只保留文本、CFI 与章节 href（跳转兜底）
-          chunks.push({ label: c.label, text: c.text, cfi: cfi || "", href: item.href || "" });
+          // 清除 DOM 引用；startText 用于运行时在已渲染章节中定位段落
+          const firstPara = (c.paras && c.paras.length) ? c.paras[0].text : c.text;
+          chunks.push({
+            label: c.label,
+            text: c.text,
+            startText: normalizeText(firstPara).substring(0, 40),
+            href: item.href || ""
+          });
         }
       } catch (e) {
         // 单个章节加载失败不阻塞整本书
@@ -362,7 +356,7 @@ ${JSON.stringify(summaries)}`;
     let count = 0;
     out = out.replace(/【\s*C(\d+)\s*】/g, function (m, idxStr) {
       const idx = parseInt(idxStr, 10);
-      if (chunks[idx] && chunks[idx].cfi) {
+      if (chunks[idx] && (chunks[idx].startText || chunks[idx].cfi)) {
         count++;
         return " [↩ 原文](aireader-cfi:" + idx + ")";
       }
@@ -371,7 +365,7 @@ ${JSON.stringify(summaries)}`;
     if (count === 0) {
       const byLabel = {};
       chunks.forEach(function (c, idx) {
-        if (c.cfi && byLabel[c.label] === undefined) byLabel[c.label] = idx;
+        if ((c.startText || c.cfi) && byLabel[c.label] === undefined) byLabel[c.label] = idx;
       });
       out = out.replace(/^(#{2,3})\s+(.+?)\s*$/gm, function (line, hashes, title) {
         const key = title.trim();
@@ -518,7 +512,7 @@ ${JSON.stringify(summaries)}`;
       anchoredCount = anchored.anchoredCount;
     }
     const anchors = chunks.map(function (c) {
-      return c.cfi ? { label: c.label, cfi: c.cfi, href: c.href || "" } : null;
+      return (c.startText || c.cfi) ? { label: c.label, href: c.href || "", startText: c.startText || "", cfi: c.cfi || "" } : null;
     });
 
     activeAbort = null;

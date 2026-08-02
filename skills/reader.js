@@ -828,6 +828,39 @@
       const idx = parseInt(link.getAttribute("href").slice("aireader-cfi:".length), 10);
       const anchor = extractAnchors[idx];
       if (anchor && rendition) {
+        // 在已渲染章节文档中按段落文本定位，用 epub.js 自己的 cfiFromRange 生成 CFI
+        const locateInContents = function (startText) {
+          try {
+            const contentsList = rendition.getContents();
+            if (!contentsList || !contentsList.length) return false;
+            const target = String(startText || "").replace(/\s+/g, "");
+            if (!target) return false;
+            for (const contents of contentsList) {
+              const doc = contents.document;
+              if (!doc || !doc.body) continue;
+              const paras = Array.prototype.slice.call(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"));
+              for (const el of paras) {
+                const t = String(el.textContent || "").replace(/\s+/g, "");
+                if (t && t.indexOf(target) === 0) {
+                  const range = doc.createRange();
+                  range.setStart(el, 0);
+                  range.collapse(true);
+                  if (contents.cfiFromRange) {
+                    const cfi = contents.cfiFromRange(range);
+                    rendition.display(cfi).catch(function (err) {
+                      console.error("段落定位翻页失败:", err);
+                    });
+                  }
+                  return true;
+                }
+              }
+            }
+          } catch (err) {
+            console.error("定位原文失败:", err);
+          }
+          return false;
+        };
+
         if (anchor.cfi) {
           rendition.display(anchor.cfi).catch(function (err) {
             console.error("CFI 跳转失败，回退到章节:", err);
@@ -836,6 +869,13 @@
                 console.error("章节回退失败:", e2);
               });
             }
+          });
+        } else if (anchor.startText && anchor.href) {
+          // 先加载章节，再在渲染后的文档中定位段落
+          rendition.display(anchor.href).then(function () {
+            locateInContents(anchor.startText);
+          }).catch(function (err) {
+            console.error("章节加载失败:", err);
           });
         } else if (anchor.href) {
           rendition.display(anchor.href).catch(function (err) {
