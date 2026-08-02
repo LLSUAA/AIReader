@@ -261,6 +261,7 @@ ${chunk.text}`;
 5. 涉及具体数字（层数、占比、概率、年份）时必须与摘要完全一致，禁止改写。
 6. Mermaid 中同一概念只能出现一个节点，禁止重复命名。
 7. 骨架中每条以 - 开头的要点末尾必须标注其来源分块编号【C编号】，编号只能是本摘要中出现的 chunk_index；综合多个分块时标注最相关的一个；禁止编造编号。
+8. 若全书有多个分块，各条要点的【C编号】必须与要点实际引用的摘要块一一对应，禁止所有要点标注同一个编号；不确定时标注最贴近的编号并在该要点末尾加（近似）。
 
 ${failedNote}
 
@@ -358,24 +359,42 @@ ${JSON.stringify(summaries)}`;
     }
     let out = String(markdown);
     let count = 0;
+    const usedMarkerIndices = [];
     out = out.replace(/【\s*C(\d+)\s*】/g, function (m, idxStr) {
       const idx = parseInt(idxStr, 10);
       if (chunks[idx] && (chunks[idx].startText || chunks[idx].cfi)) {
         count++;
-        return " [↩ 原文](aireader-cfi:" + idx + ")";
+        usedMarkerIndices.push(idx);
+        const partMatch = String(chunks[idx].label).match(/（第(\d+)部分）/);
+        const linkText = partMatch ? "↩ 第" + partMatch[1] + "部分" : "↩ 原文";
+        return " [" + linkText + "](aireader-cfi:" + idx + ")";
       }
       return "";
     });
-    if (count === 0) {
-      const byLabel = {};
-      chunks.forEach(function (c, idx) {
-        if ((c.startText || c.cfi) && byLabel[c.label] === undefined) byLabel[c.label] = idx;
-      });
+    // 模型偷懒检测：多分块书但所有要点都标了同一块 → 记录日志，便于诊断
+    const uniqueMarkers = usedMarkerIndices.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (chunks.length > 1 && uniqueMarkers.length === 1 && count > 0) {
+      console.warn("[锚点] 模型将所有要点标注为同一分块 C" + uniqueMarkers[0] + "，骨架标题兜底将被同时启用");
+    }
+    if (count === 0 || uniqueMarkers.length === 1) {
+      // 标题兜底：精确匹配优先，其次标题前缀（覆盖"（第N部分）"多分块章节）
+      const findChunkIndex = function (key) {
+        let first = -1;
+        for (let i = 0; i < chunks.length; i++) {
+          const c = chunks[i];
+          if (!(c.startText || c.cfi)) continue;
+          if (c.label === key) return i;
+          if (first === -1 && c.label.indexOf(key) === 0) first = i;
+        }
+        return first;
+      };
       out = out.replace(/^(#{2,3})\s+(.+?)\s*$/gm, function (line, hashes, title) {
-        const key = title.trim();
-        if (byLabel[key] !== undefined) {
+        const idx = findChunkIndex(title.trim());
+        if (idx !== -1) {
           count++;
-          return line + " [↩ 原文](aireader-cfi:" + byLabel[key] + ")";
+          const partMatch = String(chunks[idx].label).match(/（第(\d+)部分）/);
+          const linkText = partMatch ? "↩ 第" + partMatch[1] + "部分" : "↩ 原文";
+          return line + " [" + linkText + "](aireader-cfi:" + idx + ")";
         }
         return line;
       });

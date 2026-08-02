@@ -858,6 +858,7 @@
               for (const el of paras) {
                 const t = String(el.textContent || "").replace(/\s+/g, "");
                 if (t && t.indexOf(target) === 0) {
+                  console.info("[溯源跳转] 命中段落:", el.tagName, String(el.textContent || "").slice(0, 16));
                   const range = doc.createRange();
                   range.setStart(el, 0);
                   range.collapse(true);
