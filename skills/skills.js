@@ -8,6 +8,15 @@
 3. 跨语境映射：结合文本的固有属性，将其核心概念映射到现实生活、历史规律或心理学现象中，产生认知碰撞。
 4. 苏格拉底诘问：在每次回答末尾，必须抛出一个极具穿透力的高阶反问（思想实验或现实困境），测试用户的思想深度与认知边界。`;
 
+  // 技能上下文长度兜底：防止单 spine（尤其 TXT 整本书）一次性全量发送给模型
+  const MAX_SKILL_CONTEXT_CHARS = 8000;
+
+  function truncateContext(text, max) {
+    text = (text || "").trim();
+    if (text.length <= max) return text;
+    return text.substring(0, max) + "\n\n[内容过长，已截取前 " + max + " 字；全书分层提取功能开发中，后续将按章节完整分析]";
+  }
+
   global.SKILLS = {
     history: {
       name: "前文复盘回顾",
@@ -33,7 +42,7 @@
         const contents = rendition.getContents();
         if (!contents || contents.length === 0) return { error: "无法提取本章内容。" };
         const text = (contents[0].document.body.textContent || contents[0].document.body.innerText || "").trim();
-        return { text };
+        return { text: truncateContext(text, MAX_SKILL_CONTEXT_CHARS) };
       },
       buildPrompt: (text) => `请基于以下文本，提炼出本章的结构骨架。
 要求：若是论述类文本，提取核心论点与关键论据；若是叙事/文学类文本，提取核心冲突、人物动机或思想演变。以简洁的层级列表呈现，让我一眼看透事物运转或情感演变的第一性原理：\n\n${text}`

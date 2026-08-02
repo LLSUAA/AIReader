@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "AIReader - 深度阅读伴侣",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "硬核 AI 辅助阅读器，极简、极速的阅读+AI心智伴随体验",
   "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://api.deepseek.com/*"],
   "action": {
     "default_title": "打开 AIReader 阅读引擎"
   },

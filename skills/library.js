@@ -1,6 +1,30 @@
 (function () {
   "use strict";
 
+  // XML/HTML 转义：书名与正文进入 EPUB 结构前必须转义，防止生成非法 OPF/NCX/HTML
+  function escapeXml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeHtml(str) {
+    return escapeXml(str).replace(/'/g, "&#39;");
+  }
+
+  // TXT 编码探测：优先 UTF-8（严格模式），失败回退 GB18030（GBK 超集，覆盖国内常见 TXT）
+  function decodeTxt(arrayBuffer) {
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(arrayBuffer);
+    } catch (e) { /* UTF-8 解码失败，继续回退 */ }
+    try {
+      return new TextDecoder("gb18030").decode(arrayBuffer);
+    } catch (e) { /* 回退失败，按默认处理 */ }
+    return new TextDecoder("utf-8").decode(arrayBuffer);
+  }
+
   // 黑科技：在内存中将纯文本 TXT 实时封装为标准 EPUB 结构 (优化版排版)
   async function txtToEpubArrayBuffer(txtContent, title) {
     const zip = new JSZip();
@@ -9,20 +33,21 @@
 
     // 核心优化 1：过滤纯空行，防止 txt 自带的换行导致 <br/> 叠加引发行距爆炸
     const htmlContent = txtContent.split(/\r?\n/).map(line => {
-      const safeLine = line.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeLine = line.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return safeLine ? `<p>${safeLine}</p>` : '';
     }).filter(Boolean).join('');
 
-    const opf = `<?xml version="1.0" encoding="UTF-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${title}</dc:title><dc:language>zh-CN</dc:language></metadata><manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="chapter" href="chapter.html" media-type="application/xhtml+xml"/></manifest><spine toc="ncx"><itemref idref="chapter"/></spine></package>`;
+    const safeTitleXml = escapeXml(title);
+    const opf = `<?xml version="1.0" encoding="UTF-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${safeTitleXml}</dc:title><dc:language>zh-CN</dc:language></metadata><manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="chapter" href="chapter.html" media-type="application/xhtml+xml"/></manifest><spine toc="ncx"><itemref idref="chapter"/></spine></package>`;
     zip.file("OEBPS/content.opf", opf);
 
-    const ncx = `<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="BookId"/></head><docTitle><text>${title}</text></docTitle><navMap><navPoint id="navPoint-1" playOrder="1"><navLabel><text>正文</text></navLabel><content src="chapter.html"/></navPoint></navMap></ncx>`;
+    const ncx = `<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="BookId"/></head><docTitle><text>${safeTitleXml}</text></docTitle><navMap><navPoint id="navPoint-1" playOrder="1"><navLabel><text>正文</text></navLabel><content src="chapter.html"/></navPoint></navMap></ncx>`;
     zip.file("OEBPS/toc.ncx", ncx);
 
     // 核心优化 2：注入出版级 CSS (放大字号，规范行距，文本两端对齐)
     const chapterHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"><html xmlns="http://www.w3.org/1999/xhtml">
     <head>
-      <title>${title}</title>
+      <title>${escapeHtml(title)}</title>
       <style>
         body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 1.25em; line-height: 1.65; padding: 2% 4%; color: inherit; }
         p { margin: 0.3em 0; text-align: justify; text-indent: 2em; }
@@ -69,9 +94,8 @@
         if (isEpub) {
           arrayBuffer = event.target.result;
         } else if (isTxt) {
-          // TXT 转换逻辑：将 ArrayBuffer 转为文本，再封装成 EPUB
-          const decoder = new TextDecoder("utf-8"); // 默认按 utf-8 解码
-          const txtContent = decoder.decode(event.target.result);
+          // TXT 转换逻辑：编码探测（UTF-8 优先，GBK/GB18030 回退），再封装成 EPUB
+          const txtContent = decodeTxt(event.target.result);
           const title = file.name.replace(/\.txt$/i, "");
           arrayBuffer = await txtToEpubArrayBuffer(txtContent, title);
           finalName = title + ".epub"; // 强制以后缀名统一存储
@@ -109,7 +133,7 @@
         card.className = 'book-card';
         card.innerHTML = `
           <button class="btn-delete-book" title="删除此书">×</button>
-          <div class="book-icon">�</div>
+          <div class="book-icon">📚</div>
           <div class="book-title">${b.name.replace(/\.epub$/i, "")}</div>
         `;
         // 点击阅读
@@ -148,7 +172,7 @@
         const card = document.createElement('div');
         card.className = 'principle-card';
         const dateStr = new Date(p.timestamp).toLocaleString();
-        const renderedText = typeof marked !== 'undefined' ? marked.parse(p.text) : p.text;
+        const renderedText = typeof window.renderMarkdown !== 'undefined' ? window.renderMarkdown(p.text) : p.text;
         card.innerHTML = `
           <div class="p-meta"><span>来源：《${p.bookName}》</span><span>${dateStr}</span></div>
           <div class="p-text">${renderedText}</div>

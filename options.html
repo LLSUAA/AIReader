@@ -161,7 +161,7 @@
   <div class="container">
     <div class="header">
       <h1>AIReader 配置</h1>
-      <p>管理 DeepSeek API 密钥与端点，所有数据本地加密存储。</p>
+      <p>管理 DeepSeek API 密钥与端点，所有数据仅保存在本地，不会上传到任何服务器。</p>
     </div>
 
     <div class="card">
@@ -174,8 +174,10 @@
       <div class="field">
         <label for="model">模型名称</label>
         <p class="hint">选择或输入模型名称，支持 DeepSeek 全系列模型。</p>
-        <input list="model-list" id="model" placeholder="deepseek-chat">
+        <input list="model-list" id="model" placeholder="deepseek-v4-flash">
         <datalist id="model-list">
+          <option value="deepseek-v4-flash">
+          <option value="deepseek-v4-pro">
           <option value="deepseek-chat">
           <option value="deepseek-reasoner">
         </datalist>

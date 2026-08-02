@@ -1,6 +1,6 @@
 # AIReader - 深度阅读伴侣
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Chrome_Extension-green.svg)
 ![Tech Stack](https://img.shields.io/badge/tech-Vanilla_JS-orange.svg)
 
@@ -24,6 +24,10 @@ AIReader 是一款基于 Chrome 扩展程序（Manifest V3）构建的本地硬�
 - **解释选中段落**：规避跨页 DOM 死锁，精准提取高亮文本，进行跨语境映射。
 - **沙盘推演测验**：抛出高阶反问并触发 UI 锁死。用户必须输入独立推演逻辑后，方可解锁后续阅读与对话。
 
+### 2.5 目录导航
+
+- 阅读器顶部工具栏新增 📑 目录按钮：EPUB 书籍按章节树展示，点击即可跳转（TXT 转换书暂无目录结构）。
+
 ### 3. 知识武器库 (Knowledge Arsenal)
 - **碎片化采矿**：阅读过程中的高价值对话可一键提炼为“知识晶体”。
 - **沉浸式回顾**：采用精装博客级 CSS 排版（大字号、宽行距、Markdown 实时解析），支持一键复制流转。
@@ -41,6 +45,7 @@ AIReader 是一款基于 Chrome 扩展程序（Manifest V3）构建的本地硬�
 - **持久化层**：IndexedDB (`db.js`) + `chrome.storage.local` (保存配置与多书阅读进度)
 - **核心解析引擎**：`epub.min.js`
 - **打包与渲染**：`jszip.min.js` (内存文件封装), `marked.min.js` (实时 HTML 转换)
+- **安全渲染**：`skills/markdown.js`（唯一允许的 Markdown 出口，转义原始 HTML）
 - **通信协议**：Fetch API + Server-Sent Events (SSE) 处理 LLM 流式输出
 
 ## 物理拓扑
@@ -56,9 +61,25 @@ AIReader/
 └── skills/               # 核心逻辑模块
     ├── db.js             # 数据库引擎
     ├── api.js            # 流式大模型网关
+    ├── markdown.js       # 安全 Markdown 渲染
     └── skills.js         # 认知技能 Prompt 策略组
 
 ```
+
+## 项目文档导航
+
+| 文档 | 用途 |
+|------|------|
+| [AGENTS.md](AGENTS.md) | AI 代理与协作者的开发约定（改代码前必读） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本更新日志 |
+| [项目报告_2026-08-02.md](项目报告_2026-08-02.md) | 全局静态扫描报告（问题清单） |
+| [项目规划报告_2026-08-02.md](项目规划报告_2026-08-02.md) | 后续规划（知识提取器路线图） |
+| [docs/snapshots/](docs/snapshots/README.md) | 快照存档规范与版本基线 |
+| [docs/archive/](docs/archive/project_audit_report_2026-06-06_archived.md) | 历史审计报告（已归档） |
+
+## 开发协作
+
+本项目是个人开发者学习"正式项目流程"的样板：每次发版前打快照标签、维护更新日志、遵守 AGENTS.md 中的验证清单。提交信息使用 `type(scope): 摘要` 格式。
 
 ## 安装指南
 

@@ -13,6 +13,12 @@
     <!-- ====== 左侧：主阅读区 ====== -->
     <main class="reader-pane" id="reader-pane">
 
+      <!-- ====== 目录侧栏 ====== -->
+      <div class="toc-panel" id="toc-panel">
+        <div class="toc-header">目录</div>
+        <div class="toc-list" id="toc-list"></div>
+      </div>
+
       <!-- 加载后的阅读渲染区 -->
       <div class="viewer-container" id="viewer-container">
         <div class="topbar">
@@ -21,6 +27,7 @@
             <button class="topbar-btn" id="btn-home" title="返回大厅">🏠</button>
             <button class="topbar-btn" id="btn-lang" title="切换 AI 回复语言">中</button>
             <button class="topbar-btn" id="btn-theme" title="切换深浅色主题">🌓</button>
+            <button class="topbar-btn" id="btn-toc" title="目录">📑</button>
             <button class="topbar-btn" id="btn-close" title="关闭当前书籍">&times;</button>
           </div>
         </div>
@@ -85,10 +92,10 @@
 
   </div>
 
-  <script src="jszip.min.js"></script>
   <script src="epub.min.js"></script>
   
   <script src="marked.min.js"></script>
+  <script src="skills/markdown.js"></script>
   <script src="skills/db.js"></script>
   <script src="skills/api.js"></script>
   <script src="skills/skills.js"></script>

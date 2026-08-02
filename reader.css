@@ -470,6 +470,89 @@ body {
   background: var(--bg-hover) !important;
 }
 
+/* 发送按钮请求中禁用 */
+#btn-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- 目录导航 ---------- */
+.toc-panel {
+  position: absolute;
+  top: 49px;
+  left: 0;
+  bottom: 51px;
+  width: 280px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
+}
+
+.toc-panel.open {
+  transform: translateX(0);
+}
+
+.toc-header {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.toc-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  word-break: break-all;
+  transition: all 0.15s;
+}
+
+.toc-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.toc-depth-1 {
+  padding-left: 12px;
+  font-weight: 500;
+}
+
+.toc-depth-2 {
+  padding-left: 26px;
+}
+
+.toc-depth-3 {
+  padding-left: 40px;
+  font-size: 12.5px;
+}
+
+.toc-depth-4 {
+  padding-left: 54px;
+  font-size: 12px;
+}
+
+.toc-empty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* 知识采矿 🌟 按钮 */
 .btn-star {
   display: inline-flex;

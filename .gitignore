@@ -1,0 +1,18 @@
+# 依赖与构建产物（本项目零构建，预留）
+node_modules/
+dist/
+build/
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# 本地临时文件
+*.tmp
+*.bak
