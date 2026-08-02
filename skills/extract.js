@@ -59,7 +59,15 @@
         ).trim();
         if (!text || text.length < MIN_CHUNK_TEXT) continue;
 
-        const label = "第" + (i + 1) + "节";
+        // 提取原文章节标题（首个标题元素）：骨架忠实度依赖真实章节名
+        let title = "";
+        try {
+          const heading = doc.body.querySelector("h1, h2, h3, h4");
+          if (heading && heading.textContent) {
+            title = heading.textContent.trim().replace(/\s+/g, " ");
+          }
+        } catch (e) { /* 无标题元素则退回序号 */ }
+        const label = title ? title : "第" + (i + 1) + "节";
         if (text.length <= CHUNK_CHARS) {
           chunks.push({ label: label, text: text });
         } else {
@@ -82,7 +90,7 @@
 
 必须输出一个 JSON 对象，字段如下：
 {
-  "title": "本片段所属章节/小节名（若文本未给出章节名，用不超过20字概括）",
+  "title": "本片段所属章节/小节名：若文本中存在章节标题，必须原样使用；否则用不超过20字概括",
   "core_points": ["最多3条核心论点，每条不超过40字，必须能在原文中找到依据"],
   "concepts": [{"name": "关键概念名，不超过12字", "def": "不超过50字的定义"}],
   "relation_to_prev": "与上一块的逻辑关系（承接/转折/并列/递进/新话题），一句话不超过30字",
@@ -191,6 +199,9 @@ ${chunk.text}`;
 1. 只输出 JSON 对象，不要输出任何其他文字或代码围栏。
 2. framework_markdown 字段内的值必须是 Markdown 原文，禁止把 JSON 对象或转义字符串塞进该字段。
 3. 所有内容必须能在给定摘要中找到依据；找不到就省略，不要编造。
+4. 章节骨架中每一章的标题必须使用摘要提供的原文章节名，禁止自拟、合并或改名；摘要中出现的所有章节都必须覆盖，每章至少一条要点。
+5. 涉及具体数字（层数、占比、概率、年份）时必须与摘要完全一致，禁止改写。
+6. Mermaid 中同一概念只能出现一个节点，禁止重复命名。
 
 分块摘要：
 ${JSON.stringify(summaries)}`;
