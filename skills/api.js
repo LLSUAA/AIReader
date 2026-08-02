@@ -175,6 +175,7 @@
           ? "（检测到模型把 token 用于思维链，请改用非 reasoning 模型，或调大 max_tokens）"
           : "（模型 " + model + " 返回空内容，请检查模型名/端点是否正确）")
       );
+      lastError.reasoning = !!hasReasoning;
     }
     throw lastError || new Error("模型未返回内容");
   };

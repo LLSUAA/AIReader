@@ -115,6 +115,52 @@ ${chunk.text}`;
     };
   }
 
+  function isReasoningError(e) {
+    return !!(e && (e.reasoning === true || /思维链|reasoning/i.test(e.message || "")));
+  }
+
+  // Map 请求：reasoning 类模型思维链会吃掉 max_tokens，逐级升级重试
+  async function requestMapWithRetry(messages, options, aborter) {
+    let lastErr = null;
+    for (const tokens of [4000, 8000, 16000]) {
+      try {
+        return await global.requestJSON(
+          messages,
+          options.model,
+          options.endpoint,
+          options.apikey,
+          { maxTokens: tokens, signal: aborter.signal, temperature: 0.2 }
+        );
+      } catch (e) {
+        if (aborter.signal.aborted) throw e;
+        lastErr = e;
+        if (!isReasoningError(e)) throw e;
+      }
+    }
+    throw lastErr;
+  }
+
+  // Reduce 请求：同样支持 reasoning 模型升级重试，并开启 fallbackRaw 降级
+  async function requestReduceWithRetry(messages, options, aborter) {
+    let lastErr = null;
+    for (const tokens of [8000, 16000]) {
+      try {
+        return await global.requestJSON(
+          messages,
+          options.model,
+          options.endpoint,
+          options.apikey,
+          { maxTokens: tokens, signal: aborter.signal, temperature: 0.3, fallbackRaw: true }
+        );
+      } catch (e) {
+        if (aborter.signal.aborted) throw e;
+        lastErr = e;
+        if (!isReasoningError(e)) throw e;
+      }
+    }
+    throw lastErr;
+  }
+
   // ---------- 第三层：全局综合（Reduce） ----------
   const REDUCE_SYSTEM = "你是一名知识提取专家。你的唯一任务是：只基于用户提供的结构化章节摘要进行综合归纳，生成全书框架。绝对禁止编造摘要中不存在的内容，禁止引用摘要之外的知识。";
 
@@ -188,15 +234,13 @@ ${JSON.stringify(summaries)}`;
         status: "running"
       });
       try {
-        const data = await global.requestJSON(
+        const data = await requestMapWithRetry(
           [
             { role: "system", content: MAP_SYSTEM },
             { role: "user", content: buildMapPrompt(chunks[i], i, chunks.length, options.bookTitle || "未命名书籍") }
           ],
-          options.model,
-          options.endpoint,
-          options.apikey,
-          { maxTokens: 4000, signal: aborter.signal, temperature: 0.2 }
+          options,
+          aborter
         );
         results.push(normalizeChunk(data, chunks[i].label));
         options.onProgress && options.onProgress({
@@ -231,15 +275,13 @@ ${JSON.stringify(summaries)}`;
 
     let reduceResult;
     try {
-      reduceResult = await global.requestJSON(
+      reduceResult = await requestReduceWithRetry(
         [
           { role: "system", content: REDUCE_SYSTEM },
           { role: "user", content: buildReducePrompt(results, options.bookTitle || "未命名书籍") }
         ],
-        options.model,
-        options.endpoint,
-        options.apikey,
-        { maxTokens: 8000, signal: aborter.signal, temperature: 0.3, fallbackRaw: true }
+        options,
+        aborter
       );
     } catch (e) {
       if (aborter.signal.aborted) return { cancelled: true };

@@ -404,14 +404,18 @@
   const extractActions = document.getElementById("extract-actions");
   const extractCancel = document.getElementById("extract-cancel");
   let extractMarkdownCache = "";
+  let extractRunning = false;
 
   function openExtractModal() {
     if (extractModal) extractModal.classList.add("open");
   }
 
   function closeExtractModal() {
+    // 提取进行中不允许被动关闭：必须显式确认取消
+    if (extractRunning && !confirm("提取正在进行，确定要取消吗？")) return;
     if (typeof window.cancelExtraction === "function") window.cancelExtraction();
     if (extractModal) extractModal.classList.remove("open");
+    extractRunning = false;
   }
 
   function resetExtractUI() {
@@ -472,6 +476,7 @@
     const model = config.model || "deepseek-v4-flash";
     resetExtractUI();
     openExtractModal();
+    extractRunning = true;
 
     // 缓存命中：同一本书已完成提取则直接展示，避免重复扣费
     if (!force) {
@@ -479,6 +484,7 @@
         const cached = await window.getExtraction(currentBookMeta);
         if (cached && cached.status === "done" && cached.result_markdown) {
           showExtractResult(cached.result_markdown, true);
+          extractRunning = false;
           return;
         }
       } catch (e) { /* 缓存读取失败按新提取处理 */ }
@@ -494,6 +500,7 @@
       });
       if (outcome.cancelled) {
         if (extractProgressText) extractProgressText.textContent = "已取消提取";
+        extractRunning = false;
         return;
       }
       const markdown = (outcome.result && outcome.result.framework_markdown) || "";
@@ -507,10 +514,12 @@
         updatedAt: Date.now()
       });
       showExtractResult(markdown, false);
+      extractRunning = false;
     } catch (e) {
       console.error("全书提取失败:", e);
       if (extractProgressText) extractProgressText.textContent = "❌ 提取失败：" + e.message;
       if (extractCancel) extractCancel.style.display = "inline-block";
+      extractRunning = false;
     }
   }
 
@@ -691,12 +700,6 @@
   if (extractDownloadBtn) extractDownloadBtn.addEventListener("click", downloadExtractMarkdown);
   const extractAgainBtn = document.getElementById("extract-again");
   if (extractAgainBtn) extractAgainBtn.addEventListener("click", function () { runExtraction(true); });
-  if (extractModal) {
-    extractModal.addEventListener("click", function (e) {
-      if (e.target === extractModal) closeExtractModal();
-    });
-  }
-
   // 发送按钮事件
   document.getElementById("btn-send").addEventListener("click", handleUserInput);
 
