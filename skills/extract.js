@@ -27,7 +27,13 @@
       const els = body.querySelectorAll
         ? Array.prototype.slice.call(body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"))
         : [];
-      for (const el of els) {
+      // 只保留"最内层"文本容器：祖先（如 blockquote）的 textContent 会重复包含子元素文本
+      const leaves = els.filter(function (el) {
+        return !els.some(function (other) {
+          return other !== el && el.contains && el.contains(other);
+        });
+      });
+      for (const el of leaves) {
         const t = (el.textContent || "").trim();
         if (t) out.push({ el: el, text: t });
       }
@@ -353,51 +359,92 @@ ${JSON.stringify(summaries)}`;
 
   // 溯源锚点注入：把骨架里的【C编号】标记替换为可点击的 aireader-cfi 链接；
   // 若模型未标编号，则按章节标题匹配分块，给标题挂锚点
+  function anchorLinkFor(idx, chunks) {
+    const partMatch = String((chunks[idx] && chunks[idx].label) || "").match(/（第(\d+)部分）/);
+    const linkText = partMatch ? "↩ 第" + partMatch[1] + "部分" : "↩ 原文";
+    return " [" + linkText + "](aireader-cfi:" + idx + ")";
+  }
+
+  // 无标记时的标题兜底：精确匹配优先，其次标题前缀（覆盖"（第N部分）"多分块章节）
+  function applyHeadingFallback(markdown, chunks) {
+    const findChunkIndex = function (key) {
+      let first = -1;
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i];
+        if (!(c.startText || c.cfi)) continue;
+        if (c.label === key) return i;
+        if (first === -1 && c.label.indexOf(key) === 0) first = i;
+      }
+      return first;
+    };
+    return String(markdown).replace(/^(#{2,3})\s+(.+?)\s*$/gm, function (line, hashes, title) {
+      const idx = findChunkIndex(title.trim());
+      return idx !== -1 ? line + anchorLinkFor(idx, chunks) : line;
+    });
+  }
+
+  // 模型偷懒（全部要点标同一块）时：按骨架顺序把该标题下的要点重新分配给分块序列
+  function reassignLazyMarkers(markdown, chunks) {
+    const lines = String(markdown).split("\n");
+    let currentKey = "";
+    let bulletNo = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const heading = line.match(/^(#{2,3})\s+(.+?)\s*$/);
+      if (heading) {
+        currentKey = heading[2].trim();
+        bulletNo = 0;
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line) && /【\s*C\d+\s*】/.test(line)) {
+        const seq = [];
+        for (let j = 0; j < chunks.length; j++) {
+          if (chunks[j].label === currentKey || chunks[j].label.indexOf(currentKey) === 0) seq.push(j);
+        }
+        if (seq.length) {
+          const idx = seq[bulletNo % seq.length];
+          lines[i] = line.replace(/【\s*C\d+\s*】/, function () { return anchorLinkFor(idx, chunks); });
+          bulletNo++;
+        }
+      }
+    }
+    return lines.join("\n");
+  }
+
   global.applyFrameworkAnchors = function (markdown, chunks) {
     if (!markdown || !chunks || !chunks.length) {
       return { markdown: String(markdown || ""), anchoredCount: 0 };
     }
     let out = String(markdown);
-    let count = 0;
-    const usedMarkerIndices = [];
-    out = out.replace(/【\s*C(\d+)\s*】/g, function (m, idxStr) {
-      const idx = parseInt(idxStr, 10);
-      if (chunks[idx] && (chunks[idx].startText || chunks[idx].cfi)) {
-        count++;
-        usedMarkerIndices.push(idx);
-        const partMatch = String(chunks[idx].label).match(/（第(\d+)部分）/);
-        const linkText = partMatch ? "↩ 第" + partMatch[1] + "部分" : "↩ 原文";
-        return " [" + linkText + "](aireader-cfi:" + idx + ")";
-      }
-      return "";
-    });
-    // 模型偷懒检测：多分块书但所有要点都标了同一块 → 记录日志，便于诊断
-    const uniqueMarkers = usedMarkerIndices.filter(function (v, i, a) { return a.indexOf(v) === i; });
-    if (chunks.length > 1 && uniqueMarkers.length === 1 && count > 0) {
-      console.warn("[锚点] 模型将所有要点标注为同一分块 C" + uniqueMarkers[0] + "，骨架标题兜底将被同时启用");
+
+    // 先扫描标记，判断模型是否偷懒
+    const markerPattern = /【\s*C(\d+)\s*】/g;
+    const markerMatches = [];
+    let mm;
+    while ((mm = markerPattern.exec(out)) !== null) {
+      markerMatches.push(parseInt(mm[1], 10));
     }
-    if (count === 0 || uniqueMarkers.length === 1) {
-      // 标题兜底：精确匹配优先，其次标题前缀（覆盖"（第N部分）"多分块章节）
-      const findChunkIndex = function (key) {
-        let first = -1;
-        for (let i = 0; i < chunks.length; i++) {
-          const c = chunks[i];
-          if (!(c.startText || c.cfi)) continue;
-          if (c.label === key) return i;
-          if (first === -1 && c.label.indexOf(key) === 0) first = i;
-        }
-        return first;
-      };
-      out = out.replace(/^(#{2,3})\s+(.+?)\s*$/gm, function (line, hashes, title) {
-        const idx = findChunkIndex(title.trim());
-        if (idx !== -1) {
+    const uniqueMarkers = markerMatches.filter(function (v, i, a) { return a.indexOf(v) === i; });
+
+    let count = 0;
+    if (markerMatches.length > 0 && chunks.length > 1 && uniqueMarkers.length === 1) {
+      // 模型偷懒：按骨架顺序重新分配，让不同要点指向不同分块
+      console.warn("[锚点] 模型将所有要点标注为同一分块 C" + uniqueMarkers[0] + "，已按骨架顺序重新分配");
+      out = reassignLazyMarkers(out, chunks);
+      count = (out.match(/aireader-cfi:\d+/g) || []).length;
+    } else {
+      out = out.replace(/【\s*C(\d+)\s*】/g, function (m2, idxStr) {
+        const idx = parseInt(idxStr, 10);
+        if (chunks[idx] && (chunks[idx].startText || chunks[idx].cfi)) {
           count++;
-          const partMatch = String(chunks[idx].label).match(/（第(\d+)部分）/);
-          const linkText = partMatch ? "↩ 第" + partMatch[1] + "部分" : "↩ 原文";
-          return line + " [" + linkText + "](aireader-cfi:" + idx + ")";
+          return anchorLinkFor(idx, chunks);
         }
-        return line;
+        return "";
       });
+      if (count === 0) {
+        out = applyHeadingFallback(out, chunks);
+        count = (out.match(/aireader-cfi:\d+/g) || []).length;
+      }
     }
     return { markdown: out, anchoredCount: count };
   };
