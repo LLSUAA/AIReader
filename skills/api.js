@@ -80,27 +80,40 @@
     }
   };
 
-  // 从模型输出中容错提取 JSON 对象（兼容代码围栏/前后说明文字/尾逗号/顶层数组）
+  // 从模型输出中容错提取 JSON 对象（兼容代码围栏/前后说明文字/尾逗号/缺失逗号/顶层数组）
   global.extractJSONContent = function(content) {
     if (!content) throw new Error("模型未返回内容");
     let text = String(content).replace(/^\uFEFF/, "").trim();
     const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fence) text = fence[1].trim();
-    // 容错修复：删除对象/数组末尾的多余逗号（模型常见输出错误）
-    text = text.replace(/,\s*([}\]])/g, "$1");
+
+    // 定位候选 JSON 区间：优先对象，其次数组
+    let candidate = text;
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start !== -1 && end > start) {
-      return JSON.parse(text.substring(start, end + 1));
+      candidate = text.substring(start, end + 1);
+    } else {
+      const arrStart = text.indexOf("[");
+      const arrEnd = text.lastIndexOf("]");
+      if (arrStart !== -1 && arrEnd > arrStart) {
+        candidate = text.substring(arrStart, arrEnd + 1);
+      }
     }
-    // 顶层数组兜底：部分模型会把"JSON 数组"理解成输出数组
-    const arrStart = text.indexOf("[");
-    const arrEnd = text.lastIndexOf("]");
-    if (arrStart !== -1 && arrEnd > arrStart) {
-      const arr = JSON.parse(text.substring(arrStart, arrEnd + 1));
-      if (Array.isArray(arr) && arr.length) return arr[0];
+
+    // 容错修复：
+    // 1) 删除对象/数组末尾的多余逗号（模型常见输出错误）
+    // 2) 在两个字符串/值之间补缺失逗号（如 ["a" "b"]、{"a":1 "b":2}）
+    const repaired = candidate
+      .replace(/,\s*([}\]])/g, "$1")
+      .replace(/(?<![:\{,])[\t ]+(?=")/g, ",");
+
+    try {
+      return JSON.parse(repaired);
+    } catch (e) {
+      // 修复失败时，若原始候选本身可解析则返回原始（防止修复过度）
+      return JSON.parse(candidate);
     }
-    throw new Error("无法从模型输出中解析 JSON");
   };
 
   // 兼容不同厂商的 content 结构：字符串 / 分块数组 / 缺失

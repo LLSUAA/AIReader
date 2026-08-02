@@ -127,17 +127,23 @@ ${chunk.text}`;
     return !!(e && (e.reasoning === true || /思维链|reasoning/i.test(e.message || "")));
   }
 
-  // Map 请求：reasoning 类模型思维链会吃掉 max_tokens，逐级升级重试
-  async function requestMapWithRetry(messages, options, aborter) {
+  // reasoning 模型兜底：思维链吃光 max_tokens 时，回退到非思维链模型重试
+  function fallbackModel(model) {
+    const m = String(model || "").toLowerCase();
+    return m === "deepseek-chat" ? "" : "deepseek-chat";
+  }
+
+  // 通用重试：按 [model, maxTokens] 阶梯尝试；仅 reasoning 类错误才继续下一档
+  async function requestWithRetry(messages, options, aborter, attempts, temperature, fallbackRaw) {
     let lastErr = null;
-    for (const tokens of [4000, 8000, 16000]) {
+    for (const attempt of attempts) {
       try {
         return await global.requestJSON(
           messages,
-          options.model,
+          attempt.model,
           options.endpoint,
           options.apikey,
-          { maxTokens: tokens, signal: aborter.signal, temperature: 0.2 }
+          { maxTokens: attempt.maxTokens, signal: aborter.signal, temperature: temperature, fallbackRaw: !!fallbackRaw }
         );
       } catch (e) {
         if (aborter.signal.aborted) throw e;
@@ -148,25 +154,19 @@ ${chunk.text}`;
     throw lastErr;
   }
 
-  // Reduce 请求：同样支持 reasoning 模型升级重试，并开启 fallbackRaw 降级
-  async function requestReduceWithRetry(messages, options, aborter) {
-    let lastErr = null;
-    for (const tokens of [8000, 16000]) {
-      try {
-        return await global.requestJSON(
-          messages,
-          options.model,
-          options.endpoint,
-          options.apikey,
-          { maxTokens: tokens, signal: aborter.signal, temperature: 0.3, fallbackRaw: true }
-        );
-      } catch (e) {
-        if (aborter.signal.aborted) throw e;
-        lastErr = e;
-        if (!isReasoningError(e)) throw e;
-      }
-    }
-    throw lastErr;
+  function buildMapAttempts(model) {
+    // 同一模型最多试 2 档，仍失败立即换非思维链模型，避免烧 token 浪费时间
+    const attempts = [[model, 4000], [model, 8000]];
+    const fb = fallbackModel(model);
+    if (fb) attempts.push([fb, 8000]);
+    return attempts.map(function (a) { return { model: a[0], maxTokens: a[1] }; });
+  }
+
+  function buildReduceAttempts(model) {
+    const attempts = [[model, 8000]];
+    const fb = fallbackModel(model);
+    if (fb) attempts.push([fb, 16000]);
+    return attempts.map(function (a) { return { model: a[0], maxTokens: a[1] }; });
   }
 
   // ---------- 第三层：全局综合（Reduce） ----------
@@ -256,47 +256,80 @@ ${JSON.stringify(summaries)}`;
       throw new Error("未能从本书提取到任何文本，请确认文件内容可读。");
     }
 
-    const results = [];
+    // Map 阶段：并发工作池（默认 3），支持断点续传（resume）与逐块落盘（onChunkDone）
+    const results = new Array(chunks.length).fill(null);
+    const resume = options.resume || {};
+    let completedCount = 0;
     for (let i = 0; i < chunks.length; i++) {
-      if (aborter.signal.aborted) return { cancelled: true };
-      options.onProgress && options.onProgress({
-        phase: "map",
-        current: i,
-        total: chunks.length,
-        label: chunks[i].label,
-        status: "running"
-      });
-      try {
-        const data = await requestMapWithRetry(
-          [
-            { role: "system", content: MAP_SYSTEM },
-            { role: "user", content: buildMapPrompt(chunks[i], i, chunks.length, options.bookTitle || "未命名书籍") }
-          ],
-          options,
-          aborter
-        );
-        results.push(normalizeChunk(data, chunks[i].label));
-        options.onProgress && options.onProgress({
-          phase: "map",
-          current: i + 1,
-          total: chunks.length,
-          label: chunks[i].label,
-          status: "done"
-        });
-      } catch (e) {
-        if (aborter.signal.aborted) return { cancelled: true };
-        options.onProgress && options.onProgress({
-          phase: "map",
-          current: i + 1,
-          total: chunks.length,
-          label: chunks[i].label,
-          status: "error",
-          error: e.message
-        });
-        // 单块失败不中断全书：写入占位摘要，保证 Reduce 可继续
-        results.push(normalizeChunk({ title: chunks[i].label, core_points: ["（该块提取失败：" + e.message + "）"], confidence: "low" }, chunks[i].label));
+      if (resume[i] && resume[i].chapter) {
+        results[i] = resume[i];
+        completedCount++;
       }
     }
+    if (completedCount > 0 && options.onProgress) {
+      options.onProgress({ phase: "resume", current: completedCount, total: chunks.length, label: "已恢复 " + completedCount + " 块缓存，继续提取..." });
+    }
+
+    const CONCURRENCY = 3;
+    let nextIndex = 0;
+
+    async function mapWorker() {
+      while (!aborter.signal.aborted) {
+        const idx = nextIndex++;
+        if (idx >= chunks.length) return;
+        if (results[idx]) continue; // 断点续传命中
+        options.onProgress && options.onProgress({
+          phase: "map",
+          current: completedCount,
+          total: chunks.length,
+          label: chunks[idx].label,
+          status: "running"
+        });
+        try {
+          const data = await requestWithRetry(
+            [
+              { role: "system", content: MAP_SYSTEM },
+              { role: "user", content: buildMapPrompt(chunks[idx], idx, chunks.length, options.bookTitle || "未命名书籍") }
+            ],
+            options,
+            aborter,
+            buildMapAttempts(options.model),
+            0.2,
+            false
+          );
+          results[idx] = normalizeChunk(data, chunks[idx].label);
+          completedCount++;
+          options.onProgress && options.onProgress({
+            phase: "map",
+            current: completedCount,
+            total: chunks.length,
+            label: chunks[idx].label,
+            status: "done"
+          });
+        } catch (e) {
+          if (aborter.signal.aborted) return;
+          completedCount++;
+          options.onProgress && options.onProgress({
+            phase: "map",
+            current: completedCount,
+            total: chunks.length,
+            label: chunks[idx].label,
+            status: "error",
+            error: e.message
+          });
+          // 单块失败不中断全书：写入占位摘要，保证 Reduce 可继续
+          results[idx] = normalizeChunk({ title: chunks[idx].label, core_points: ["（该块提取失败：" + e.message + "）"], confidence: "low" }, chunks[idx].label);
+        }
+        if (typeof options.onChunkDone === "function") {
+          try { options.onChunkDone(idx, results[idx]); } catch (e2) { /* 持久化失败不阻塞提取 */ }
+        }
+      }
+    }
+
+    const workers = [];
+    const workerCount = Math.min(CONCURRENCY, chunks.length);
+    for (let w = 0; w < workerCount; w++) workers.push(mapWorker());
+    await Promise.all(workers);
 
     if (aborter.signal.aborted) return { cancelled: true };
     options.onProgress && options.onProgress({
@@ -308,13 +341,16 @@ ${JSON.stringify(summaries)}`;
 
     let reduceResult;
     try {
-      reduceResult = await requestReduceWithRetry(
+      reduceResult = await requestWithRetry(
         [
           { role: "system", content: REDUCE_SYSTEM },
           { role: "user", content: buildReducePrompt(results, options.bookTitle || "未命名书籍") }
         ],
         options,
-        aborter
+        aborter,
+        buildReduceAttempts(options.model),
+        0.3,
+        true
       );
     } catch (e) {
       if (aborter.signal.aborted) return { cancelled: true };

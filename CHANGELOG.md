@@ -13,6 +13,11 @@
   - 结果落库缓存（IndexedDB `extractions` store，db 版本 v3）：同一本书重复提取直接读缓存，避免重复扣费；支持"重新提取"强制更新。
   - 一键复制 Markdown / 下载 `.md` 文件（带 BOM，Windows 记事本不乱码）。
   - `api.js` 新增非流式 JSON 请求 `requestJSON()`（自动回退不支持 `response_format` 的端点）与 token 估算。
+- 提取速度与可靠性升级：
+  - Map 阶段并发 3 路提取（原串行），同样文档耗时约降至 1/3。
+  - **断点续传**：每块结果即时落盘；提取失败/取消后重试自动跳过已完成块，不重复扣费。
+  - **reasoning 模型自动回退**：思维链模型连续失败后自动改用 `deepseek-chat` 重试（Map/Reduce 各最多试 2 档即切换），不再死磕高 token 上限。
+  - JSON 解析新增"缺失逗号"容错（`["a" "b"]`、`{"a":1 "b":2}`）。
 
 ### Changed
 

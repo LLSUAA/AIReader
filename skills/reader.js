@@ -445,6 +445,9 @@
         extractStatus.scrollTop = extractStatus.scrollHeight;
         while (extractStatus.children.length > 100) extractStatus.removeChild(extractStatus.firstChild);
       }
+    } else if (p.phase === "resume") {
+      if (extractProgressFill) extractProgressFill.style.width = Math.round((p.current / p.total) * 100) + "%";
+      if (extractProgressText) extractProgressText.textContent = p.label;
     } else if (p.phase === "reduce") {
       extractProgressFill.style.width = "100%";
       extractProgressText.textContent = "正在综合生成全书框架...";
@@ -500,10 +503,11 @@
     openExtractModal();
     extractRunning = true;
 
-    // 缓存命中：同一本书已完成提取则直接展示，避免重复扣费
+    // 缓存：已完成 → 直接展示；未完成 → 断点续传
+    let cached = null;
     if (!force) {
       try {
-        const cached = await window.getExtraction(currentBookMeta);
+        cached = await window.getExtraction(currentBookMeta);
         if (cached && cached.status === "done" && cached.result_markdown) {
           const md = typeof window.normalizeFrameworkMarkdown === "function"
             ? window.normalizeFrameworkMarkdown(cached.result_markdown)
@@ -521,13 +525,35 @@
       } catch (e) { /* 缓存读取失败按新提取处理 */ }
     }
 
+    let resume = null;
+    let runningChunks = [];
+    if (!force && cached && cached.status === "running" && Array.isArray(cached.chunks) && cached.chunks.length) {
+      resume = cached.chunks;
+      runningChunks = cached.chunks.slice();
+      if (extractProgressText) extractProgressText.textContent = "检测到未完成的提取，正在恢复进度...";
+    }
+
     try {
       const outcome = await window.extractBookFramework(book, {
         bookTitle: currentBookMeta,
         apikey: config.apikey,
         endpoint: endpoint,
         model: model,
-        onProgress: renderExtractProgress
+        onProgress: renderExtractProgress,
+        resume: resume,
+        onChunkDone: async function (idx, data) {
+          // 每完成一块就落盘一次：失败/取消后下次可断点续传，不重复扣费
+          runningChunks[idx] = data;
+          try {
+            await window.saveExtraction({
+              bookName: currentBookMeta,
+              status: "running",
+              chunks: runningChunks,
+              chunkCount: runningChunks.length,
+              updatedAt: Date.now()
+            });
+          } catch (e) { /* 落盘失败不阻塞提取 */ }
+        }
       });
       if (outcome.cancelled) {
         if (extractProgressText) extractProgressText.textContent = "已取消提取";
