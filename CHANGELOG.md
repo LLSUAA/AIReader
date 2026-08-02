@@ -44,8 +44,10 @@
 - 修复导出/展示偶发出现整段 JSON 的问题：新增 `normalizeFrameworkMarkdown()` 自动解包模型嵌套的 JSON 字符串，旧缓存读取时自动纠正。
 - 修复 JSON 解析 "Unterminated string" 报错：模型把裸换行/回车/Tab 写进字符串值时自动转义。
 - 修复 JSON 解析 "Expected property name" 报错：模型输出未加引号的键（如 `{title: "x"}`）时自动补引号。
+- 修复 "Expected property name" 在中文键/中文引号键（`{标题: ...}`、`{“title”: ...}`）下的残留问题；Map 阶段即使模型完全不按 JSON 输出，也会降级为"原文节选"而不是整块失败。
 - 修复嵌套 JSON 解包失败导致"格式问题"复现：解包改用容错解析（尾逗号/缺失逗号/字符串换行全部兼容）。
 - 新增 `salvageFrameworkMarkdown()` 最后一道保险：即使整体 JSON 无法解析（含转义引号、尾随垃圾），也能正则提取 `framework_markdown` 字段值并解码，杜绝原始 JSON 显示。
+- 修复 CFI 溯源跳转无反应：`cfiBase` 直接挂在 spine item 上（如 `/6/2`），改为 `item.cfiBase` 优先；锚点同时保存章节 href，CFI 跳转失败时自动回退到章节跳转。
 - 修复失败分块以占位章节混入章节骨架的问题：失败块不再进入 Reduce 综合，改为在溯源说明中注明未能提取的块。
 - 提取管线 max_tokens 上调（Map 4000 / Reduce 8000），兼容思维链型模型。
 

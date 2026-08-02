@@ -109,7 +109,8 @@
       candidate
         .replace(/,\s*([}\]])/g, "$1")
         .replace(/(?<![:\{,])[\t ]+(?=")/g, ",")
-        .replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3')
+        .replace(/([{,]\s*)([A-Za-z_$\u4e00-\u9fff][\w$\u4e00-\u9fff]*)(\s*:)/g, '$1"$2"$3')
+        .replace(/[“”]([^”"]+)[“”]\s*:/g, '"$1":')
     );
 
     let lastErr = null;

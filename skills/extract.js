@@ -94,7 +94,8 @@
           }
         } catch (e) { /* 无标题元素则退回序号 */ }
         const label = title ? title : "第" + (i + 1) + "节";
-        const base = (item.section && item.section.cfiBase) || "";
+        // cfiBase 直接挂在 spine item 上（如 /6/2），部分封装可能放在 section
+        const base = item.cfiBase || (item.section && item.section.cfiBase) || "";
         const paragraphs = extractParagraphs(doc.body);
         const made = [];
         if (paragraphs.length) {
@@ -105,8 +106,8 @@
         for (const c of made) {
           const anchorEl = (c.paras && c.paras.length) ? c.paras[0].el : doc.body;
           const cfi = computeCfiForElement(doc, anchorEl, base);
-          // 清除 DOM 引用（不进入提示词/日志），只保留文本与 CFI
-          chunks.push({ label: c.label, text: c.text, cfi: cfi || "" });
+          // 清除 DOM 引用（不进入提示词/日志），只保留文本、CFI 与章节 href（跳转兜底）
+          chunks.push({ label: c.label, text: c.text, cfi: cfi || "", href: item.href || "" });
         }
       } catch (e) {
         // 单个章节加载失败不阻塞整本书
@@ -144,6 +145,17 @@ ${chunk.text}`;
 
   function normalizeChunk(data, fallbackTitle) {
     const d = data && typeof data === "object" ? data : {};
+    // 模型未按 JSON 输出时的降级：把原始文本节选作为核心要点，避免整块失败
+    if (d.__raw) {
+      const raw = String(d.__raw).trim();
+      return {
+        chapter: String(fallbackTitle || "未命名章节"),
+        core_points: ["【模型未按格式输出，以下为原文节选】" + raw.substring(0, 200)],
+        concepts: [],
+        relation_to_prev: "",
+        confidence: "low"
+      };
+    }
     const corePoints = Array.isArray(d.core_points)
       ? d.core_points.map(String)
       : (d.corePoints ? [String(d.corePoints)] : []);
@@ -425,7 +437,7 @@ ${JSON.stringify(summaries)}`;
             aborter,
             buildMapAttempts(options.model),
             0.2,
-            false
+            true
           );
           results[idx] = normalizeChunk(data, chunks[idx].label);
           completedCount++;
@@ -506,7 +518,7 @@ ${JSON.stringify(summaries)}`;
       anchoredCount = anchored.anchoredCount;
     }
     const anchors = chunks.map(function (c) {
-      return c.cfi ? { label: c.label, cfi: c.cfi } : null;
+      return c.cfi ? { label: c.label, cfi: c.cfi, href: c.href || "" } : null;
     });
 
     activeAbort = null;

@@ -822,10 +822,23 @@
       e.preventDefault();
       const idx = parseInt(link.getAttribute("href").slice("aireader-cfi:".length), 10);
       const anchor = extractAnchors[idx];
-      if (anchor && anchor.cfi && rendition) {
-        rendition.display(anchor.cfi).catch(function (err) {
-          console.error("CFI 跳转失败:", err);
-        });
+      if (anchor && rendition) {
+        if (anchor.cfi) {
+          rendition.display(anchor.cfi).catch(function (err) {
+            console.error("CFI 跳转失败，回退到章节:", err);
+            if (anchor.href) {
+              rendition.display(anchor.href).catch(function (e2) {
+                console.error("章节回退失败:", e2);
+              });
+            }
+          });
+        } else if (anchor.href) {
+          rendition.display(anchor.href).catch(function (err) {
+            console.error("章节跳转失败:", err);
+          });
+        } else {
+          return;
+        }
         closeExtractModal();
       }
     });
