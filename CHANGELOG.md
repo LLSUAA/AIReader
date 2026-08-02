@@ -19,6 +19,10 @@
 - 删除书籍时级联清理该书的全书提取缓存。
 - 版本升至 1.1.0。
 
+### Fixed
+
+- 修复 1.1.0 中误移除 reader.html 的 JSZip 依赖导致 EPUB 打开报错 "JSZip lib not loaded" 的问题（epub.js 在加载与运行时解包均依赖 JSZip）。
+
 ## [1.0.1] - 2026-08-02
 
 ### Added
@@ -44,7 +48,7 @@
 - 修复书架卡片图标为损坏字符的问题（恢复 📚）。
 - 统一模型名默认值（`deepseek-v4-flash`）于配置页、下拉列表与阅读器兜底逻辑。
 - 修正配置页"本地加密存储"的不实宣传为"仅保存在本地，不上传服务器"。
-- 移除 reader.html 中无用的 jszip 加载；清理 reader.js 头部过时的 LocalForage 注释。
+- 清理 reader.js 头部过时的 LocalForage 注释。
 - `manifest.json` 声明 `api.deepseek.com` 的 host 权限，减少官方 API 的跨域不确定性。
 
 ### Changed

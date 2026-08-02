@@ -49,6 +49,7 @@ docs/                # 报告、快照、归档
 ## 5. 已知技术约束（改代码前必看）
 
 - **epub.js 0.3**：目录用 `book.loaded.navigation`（Promise → `{ toc: [...] }`）；翻页/定位用 `rendition.currentLocation().start.index` 与 CFI。TOC 条目结构 `{ href, label, subitems }`。
+- **epub.js 依赖 JSZip**：`epub.min.js` 在加载时即读取 `window.JSZip`，运行时解包 EPUB 也需要它。`reader.html` 与 `library.html` 都必须在 `epub.min.js` 之前加载 `jszip.min.js`，**不要误删**（2026-08-02 曾因此踩坑）。
 - **全书提取管线**：`skills/extract.js` 是"一键提取全书框架"的唯一入口。Map 阶段输出固定 JSON schema（title/core_points/concepts/relation_to_prev/confidence），Reduce 阶段输出 `{ book_summary, framework_markdown }`。结果缓存在 IndexedDB `extractions` store（keyPath: bookName），改 schema 时必须同步升级缓存结构（db 版本 v3）。
 - **MV3 CSP**：扩展页禁止内联 `<script>`（event handler 属性也不可用）；跨域 fetch 需要 `host_permissions`（目前声明了 `api.deepseek.com`），自定义 Endpoint 需对方允许 CORS。
 - **IndexedDB 版本升级**：改 `db.js` 的 store 结构时递增 `indexedDB.open(DB_NAME, N)` 的版本号，并在 `onupgradeneeded` 中迁移；用户已有数据不可丢。
