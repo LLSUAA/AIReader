@@ -636,13 +636,15 @@
       showExtractResult(markdown, false);
       finishExtractRun();
     } catch (e) {
-      console.error("全书提取失败:", e);
+      console.error("全书提取失败:", e && e.name, e && e.message, e);
       // 用户取消/请求中止：显示"已取消"，不当作失败
       const isAbort = !!(e && (e.name === "AbortError" ||
         (typeof DOMException !== "undefined" && e instanceof DOMException) ||
         /aborted|The user aborted/i.test(String(e.message || ""))));
       if (extractProgressText) {
-        extractProgressText.textContent = isAbort ? "已取消提取" : "❌ 提取失败：" + e.message;
+        extractProgressText.textContent = isAbort
+          ? "已取消提取（" + ((e && e.message) || "请求被中止") + "）"
+          : "❌ 提取失败：" + ((e && e.message) || (e && e.name) || "未知错误");
       }
       if (extractCancel) extractCancel.style.display = "inline-block";
       finishExtractRun();

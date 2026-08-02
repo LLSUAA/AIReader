@@ -188,7 +188,7 @@ ${chunk.text}`;
           { maxTokens: attempt.maxTokens, signal: aborter.signal, temperature: temperature, fallbackRaw: !!fallbackRaw }
         );
       } catch (e) {
-        if (aborter.signal.aborted) throw e;
+        if (aborter.signal.aborted || (e && e.name === "AbortError")) throw e;
         lastErr = e;
         if (!isReasoningError(e)) throw e;
       }
@@ -444,7 +444,7 @@ ${JSON.stringify(summaries)}`;
             status: "done"
           });
         } catch (e) {
-          if (aborter.signal.aborted) return;
+          if (aborter.signal.aborted || (e && e.name === "AbortError")) return;
           completedCount++;
           options.onProgress && options.onProgress({
             phase: "map",
@@ -458,7 +458,7 @@ ${JSON.stringify(summaries)}`;
           results[idx] = normalizeChunk({ title: chunks[idx].label, core_points: ["（该块提取失败：" + e.message + "）"], confidence: "low" }, chunks[idx].label);
         }
         if (typeof options.onChunkDone === "function") {
-          try { options.onChunkDone(idx, results[idx]); } catch (e2) { /* 持久化失败不阻塞提取 */ }
+          try { await options.onChunkDone(idx, results[idx]); } catch (e2) { /* 持久化失败不阻塞提取 */ }
         }
       }
     }
@@ -494,7 +494,7 @@ ${JSON.stringify(summaries)}`;
         true
       );
     } catch (e) {
-      if (aborter.signal.aborted) return { cancelled: true };
+      if (aborter.signal.aborted || (e && e.name === "AbortError")) return { cancelled: true };
       throw e;
     }
 

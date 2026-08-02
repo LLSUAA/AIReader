@@ -164,7 +164,7 @@
     const signal = options.signal || undefined;
     const temperature = typeof options.temperature === "number" ? options.temperature : 0.3;
     const fallbackRaw = !!options.fallbackRaw;
-    const timeoutMs = options.timeoutMs || 120000;
+    const timeoutMs = options.timeoutMs || 300000;
 
     const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + apikey };
     const bodyBase = { model: model, messages: messages, temperature: temperature, max_tokens: maxTokens, stream: false };
