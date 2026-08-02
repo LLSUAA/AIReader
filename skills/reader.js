@@ -452,6 +452,15 @@
   }
 
   function showExtractResult(markdown, fromCache) {
+    markdown = typeof window.normalizeFrameworkMarkdown === "function"
+      ? window.normalizeFrameworkMarkdown(markdown)
+      : String(markdown || "");
+    if (!markdown) {
+      if (extractProgressText) extractProgressText.textContent = "❌ 模型返回的框架内容无效";
+      if (extractCancel) extractCancel.style.display = "inline-block";
+      extractRunning = false;
+      return;
+    }
     extractMarkdownCache = markdown;
     if (extractProgressWrap) extractProgressWrap.style.display = "none";
     if (extractCancel) extractCancel.style.display = "none";
@@ -463,6 +472,19 @@
       extractResult.innerHTML = typeof window.renderMarkdown === "function" ? window.renderMarkdown(markdown) : markdown;
     }
     if (extractActions) extractActions.style.display = "flex";
+  }
+
+  // 下载文件时附加 Obsidian 兼容 frontmatter
+  function buildExportMarkdown() {
+    const lines = [];
+    lines.push("---");
+    lines.push("title: 《" + currentBookMeta + "》全书框架");
+    lines.push("type: AIReader-全书框架");
+    lines.push("generated: " + new Date().toISOString().slice(0, 10));
+    lines.push("---");
+    lines.push("");
+    lines.push(extractMarkdownCache);
+    return lines.join("\n");
   }
 
   async function runExtraction(force) {
@@ -483,7 +505,16 @@
       try {
         const cached = await window.getExtraction(currentBookMeta);
         if (cached && cached.status === "done" && cached.result_markdown) {
-          showExtractResult(cached.result_markdown, true);
+          const md = typeof window.normalizeFrameworkMarkdown === "function"
+            ? window.normalizeFrameworkMarkdown(cached.result_markdown)
+            : cached.result_markdown;
+          if (md) {
+            showExtractResult(md, true);
+            // 旧缓存可能是嵌套 JSON，顺手纠正，避免再次导出脏数据
+            if (md !== cached.result_markdown) {
+              await window.saveExtraction(Object.assign({}, cached, { result_markdown: md, updatedAt: Date.now() }));
+            }
+          }
           extractRunning = false;
           return;
         }
@@ -503,7 +534,9 @@
         extractRunning = false;
         return;
       }
-      const markdown = (outcome.result && outcome.result.framework_markdown) || "";
+      const markdown = typeof window.normalizeFrameworkMarkdown === "function"
+        ? window.normalizeFrameworkMarkdown(outcome.result && outcome.result.framework_markdown)
+        : ((outcome.result && outcome.result.framework_markdown) || "");
       if (!markdown) throw new Error("模型未返回有效的框架内容");
       await window.saveExtraction({
         bookName: currentBookMeta,
@@ -536,7 +569,7 @@
 
   function downloadExtractMarkdown() {
     if (!extractMarkdownCache) return;
-    const blob = new Blob(["\uFEFF" + extractMarkdownCache], { type: "text/markdown;charset=utf-8" });
+    const blob = new Blob(["\uFEFF" + buildExportMarkdown()], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

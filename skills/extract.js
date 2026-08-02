@@ -177,17 +177,19 @@ ${chunk.text}`;
 必须输出一个 JSON 对象，字段如下：
 {
   "book_summary": "一句话定位本书核心主张，不超过40字",
-  "framework_markdown": "完整框架 Markdown 文本，必须依次包含：
-    1. ## 全书定位（一句话）
-    2. ## 章节骨架（按章节层级列出核心论点与关键概念，标注来源章节名）
-    3. ## 核心概念关系（Mermaid 代码块，graph TD 语法，节点用概念名，边用关系短语）
-    4. ## 论证主线（用 A → B → C 的链条呈现全书论证/叙事推进）
-    5. ## 溯源说明（注明：本框架基于分块摘要生成，引用前请核对原文）"
+  "framework_markdown": "一页纸全书框架的纯 Markdown 原文。禁止转义、禁止嵌套 JSON、禁止在字段内重复 book_summary。严格按以下结构：
+    1. 第一行：# 《书名》全书框架
+    2. ## 全书定位：一段话，不超过 3 行
+    3. ## 章节骨架：每一篇/章用 ### 三级标题；正文用 - 无序列表，每条一行；关键概念用 **加粗**；尽量标注来源章节名
+    4. ## 核心概念关系：只包含一个 Mermaid 代码块（graph TD），节点数量不超过 20，节点用 A[概念名]，边用 -->|关系短语|
+    5. ## 论证主线：用 1. 2. 3. 有序列表呈现 A → B → C 的推进链条
+    6. ## 溯源说明：固定写一句『本框架基于分块摘要生成，引用前请核对原文。』
+    7. 所有标题前后、列表块之间必须留空行；全文禁止出现 JSON、花括号包裹或转义符号"
 }
 
 约束：
 1. 只输出 JSON 对象，不要输出任何其他文字或代码围栏。
-2. framework_markdown 内部可以使用 Markdown 语法与 Mermaid 代码围栏。
+2. framework_markdown 字段内的值必须是 Markdown 原文，禁止把 JSON 对象或转义字符串塞进该字段。
 3. 所有内容必须能在给定摘要中找到依据；找不到就省略，不要编造。
 
 分块摘要：
@@ -209,6 +211,26 @@ ${JSON.stringify(summaries)}`;
     }
     return lines.slice(start).join("\n").trim();
   }
+
+  // 模型偶尔会把 framework_markdown 嵌套成 JSON 字符串/对象，统一解包为纯 Markdown
+  global.normalizeFrameworkMarkdown = function (raw) {
+    if (raw && typeof raw === "object") {
+      if (Array.isArray(raw)) {
+        return raw.length ? global.normalizeFrameworkMarkdown(raw[0]) : "";
+      }
+      if (raw.framework_markdown !== undefined) return global.normalizeFrameworkMarkdown(raw.framework_markdown);
+      if (raw.markdown !== undefined) return global.normalizeFrameworkMarkdown(raw.markdown);
+      return "";
+    }
+    let text = String(raw || "").trim();
+    if (text.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === "object") return global.normalizeFrameworkMarkdown(parsed);
+      } catch (e) { /* 不是 JSON，按原文处理 */ }
+    }
+    return text;
+  };
 
   // ---------- 调度器 ----------
   global.extractBookFramework = async function (book, options) {

@@ -697,6 +697,72 @@ body {
   margin: 16px 0 8px;
 }
 
+.extract-result h1 {
+  font-size: 20px;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 8px;
+  margin: 4px 0 16px;
+}
+
+.extract-result h2 {
+  font-size: 17px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin: 20px 0 10px;
+}
+
+.extract-result h3 {
+  font-size: 15px;
+  color: var(--accent);
+  margin: 16px 0 8px;
+}
+
+.extract-result ul,
+.extract-result ol {
+  padding-left: 22px;
+  margin: 8px 0 12px;
+}
+
+.extract-result li {
+  margin-bottom: 6px;
+  line-height: 1.75;
+}
+
+.extract-result strong {
+  color: var(--accent);
+}
+
+.extract-result table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.extract-result th,
+.extract-result td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.extract-result th {
+  background: var(--bg-secondary);
+}
+
+.extract-result hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.extract-result code:not(pre code) {
+  background: var(--bg-hover);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
 .extract-result blockquote {
   border-left: 4px solid var(--accent);
   margin: 12px 0;
