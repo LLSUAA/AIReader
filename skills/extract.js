@@ -85,7 +85,10 @@
             title = heading.textContent.trim().replace(/\s+/g, " ");
           }
         } catch (e) { /* 无标题元素则退回序号 */ }
-        const label = title ? title : "第" + (i + 1) + "节";
+        const short = text.replace(/\s+/g, " ").trim();
+        const label = title
+          ? title
+          : (short.length > 18 ? short.substring(0, 18) + "…" : short) || ("第" + (i + 1) + "节");
         const paragraphs = extractParagraphs(doc.body);
         const made = [];
         if (paragraphs.length) {
@@ -100,7 +103,8 @@
             label: c.label,
             text: c.text,
             startText: normalizeText(firstPara).substring(0, 40),
-            href: item.href || ""
+            href: item.href || "",
+            spine: i
           });
         }
       } catch (e) {
@@ -513,7 +517,9 @@ ${JSON.stringify(summaries)}`;
       anchoredCount = anchored.anchoredCount;
     }
     const anchors = chunks.map(function (c) {
-      return (c.startText || c.cfi) ? { label: c.label, href: c.href || "", startText: c.startText || "", cfi: c.cfi || "" } : null;
+      return (c.startText || c.cfi)
+        ? { label: c.label, href: c.href || "", spine: c.spine, startText: c.startText || "", cfi: c.cfi || "" }
+        : null;
     });
 
     activeAbort = null;

@@ -831,12 +831,19 @@
   // 溯源跳转：点击骨架中的"↩ 原文"回到书籍对应章节
   if (extractResult) {
     extractResult.addEventListener("click", function (e) {
+      try {
       const link = e.target && e.target.closest ? e.target.closest('a[href^="aireader-cfi:"]') : null;
       if (!link) return;
       e.preventDefault();
       const idx = parseInt(link.getAttribute("href").slice("aireader-cfi:".length), 10);
       const anchor = extractAnchors[idx];
       if (anchor && rendition) {
+        // 解析跳转目标 href：优先用锚点保存的，缺失时按 spine 索引从 book 取
+        let targetHref = anchor.href || null;
+        if (!targetHref && anchor.spine !== undefined && book && book.spine && book.spine.spineItems) {
+          const item = book.spine.spineItems[anchor.spine];
+          if (item && item.href) targetHref = item.href;
+        }
         // 在已渲染章节文档中按段落文本定位，用 epub.js 自己的 cfiFromRange 生成 CFI
         const locateInContents = function (startText) {
           try {
@@ -870,32 +877,39 @@
           return false;
         };
 
-        if (anchor.startText && anchor.href) {
+        if (anchor.startText && targetHref) {
+          console.info("[溯源跳转] 章节加载:", targetHref);
           // 先加载章节，再在渲染后的文档中定位段落
-          rendition.display(anchor.href).then(function () {
-            locateInContents(anchor.startText);
+          rendition.display(targetHref).then(function () {
+            const found = locateInContents(anchor.startText);
+            console.info("[溯源跳转] 段落定位:", found ? "成功" : "未找到，停留在章节", anchor.label);
           }).catch(function (err) {
-            console.error("章节加载失败:", err);
+            console.error("[溯源跳转] 章节加载失败:", err);
           });
-        } else if (anchor.href) {
-          rendition.display(anchor.href).catch(function (err) {
-            console.error("章节跳转失败:", err);
+        } else if (targetHref) {
+          console.info("[溯源跳转] 章节跳转:", targetHref);
+          rendition.display(targetHref).catch(function (err) {
+            console.error("[溯源跳转] 章节跳转失败:", err);
           });
         } else if (anchor.cfi) {
           // 旧缓存兼容：只有 CFI 没有 startText 时使用
           rendition.display(anchor.cfi).catch(function (err) {
             console.error("CFI 跳转失败，回退到章节:", err);
-            if (anchor.href) {
-              rendition.display(anchor.href).catch(function (e2) {
+            if (targetHref) {
+              rendition.display(targetHref).catch(function (e2) {
                 console.error("章节回退失败:", e2);
               });
             }
           });
         } else {
+          console.warn("[溯源跳转] 锚点无效：", anchor);
           return;
         }
         closeExtractModal();
       }
+    } catch (err) {
+      console.error("[溯源跳转] 处理异常:", err);
+    }
     });
   }
   // 发送按钮事件
