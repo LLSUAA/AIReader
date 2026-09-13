@@ -1,5 +1,5 @@
 /* ============================================
-   AIReader - 安全 Markdown 渲染层
+   读见 - 安全 Markdown 渲染层
    AI 输出不可信：转义原始 HTML，外链强制安全属性
    所有 marked 渲染必须经过本文件出口
    ============================================ */
@@ -41,7 +41,7 @@
           safeTitle = title || "";
           linkText = text || "";
         }
-        // aireader-cfi 是站内溯源跳转协议（弹窗点击跳回原文），其余未知协议一律拦截
+        // aireader-cfi 是历史站内溯源协议，必须保留以兼容旧缓存；其余未知协议一律拦截
         if (!/^(https?:|mailto:|aireader-cfi:)/i.test(safeHref)) safeHref = "#";
         var inner = escapeHtml(linkText);
         if (tokens && this.parser && typeof this.parser.parseInline === "function") {

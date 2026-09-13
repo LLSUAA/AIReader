@@ -10,21 +10,39 @@
   global.streamAIResponse = async function(messages, model, endpoint, apikey, bubbleElement, options) {
     options = options || {};
     const maxTokens = options.maxTokens || 3000;
+    const timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : 90000;
+    const outerSignal = options.signal;
     bubbleElement.classList.add("loading");
     bubbleElement.textContent = "思考中...";
+
+    let timedOut = false;
+    let streamReader = null;
+    let renderTimer = null;
+    const controller = new AbortController();
+    const onOuterAbort = function () { controller.abort(); };
+    if (outerSignal) {
+      if (outerSignal.aborted) controller.abort();
+      else outerSignal.addEventListener("abort", onOuterAbort);
+    }
+    const timeoutId = setTimeout(function () {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
 
     try {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apikey },
-        body: JSON.stringify({ model: model, messages: messages, temperature: 0.7, max_tokens: maxTokens, stream: true })
+        body: JSON.stringify({ model: model, messages: messages, temperature: 0.7, max_tokens: maxTokens, stream: true }),
+        signal: controller.signal
       });
-      if (!response.ok) throw new Error("API 错误 (" + response.status + "): " + await response.text());
+      if (!response.ok) throw new Error("API 请求失败（HTTP " + response.status + "）");
+      if (!response.body) throw new Error("服务端未返回可读取的流式数据");
 
       bubbleElement.classList.remove("loading");
       bubbleElement.textContent = "";
 
-      const reader = response.body.getReader();
+      streamReader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let fullContent = "";
       let buffer = "";
@@ -34,7 +52,9 @@
       function scheduleRender() {
         const now = Date.now();
         const delay = Math.max(0, 80 - (now - lastRenderAt));
-        setTimeout(function () {
+        if (renderTimer) return;
+        renderTimer = setTimeout(function () {
+          renderTimer = null;
           lastRenderAt = Date.now();
           if (typeof global.renderMarkdown !== "undefined") {
             bubbleElement.innerHTML = global.renderMarkdown(fullContent);
@@ -46,37 +66,76 @@
         }, delay);
       }
 
-      while (true) {
-        const { done, value } = await reader.read();
+      function processSseLine(line) {
+        if (!line.startsWith("data:")) return false;
+        const payload = line.slice(5).trim();
+        if (!payload) return false;
+        if (payload === "[DONE]") return true;
+        let data;
+        try {
+          data = JSON.parse(payload);
+        } catch (e) {
+          throw new Error("服务端返回的流式数据无法解析");
+        }
+        if (data.error) throw new Error("服务端返回了流式请求错误");
+        const choice = data.choices && data.choices[0];
+        if (!choice) throw new Error("服务端返回的流式数据格式异常");
+        const delta = choice.delta && choice.delta.content;
+        if (delta) {
+          fullContent += delta;
+          scheduleRender();
+        }
+        return false;
+      }
+
+      let sawDone = false;
+      while (!sawDone) {
+        const { done, value } = await streamReader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop();
 
         for (const line of lines) {
-          if (line.startsWith("data: ") && line !== "data: [DONE]") {
-            try {
-              const data = JSON.parse(line.slice(6));
-              const delta = data.choices[0].delta.content;
-              if (delta) {
-                fullContent += delta;
-                scheduleRender();
-              }
-            } catch (e) { /* 忽略 */ }
-          }
+          if (processSseLine(line)) { sawDone = true; break; }
         }
       }
+      if (!sawDone && buffer.trim()) processSseLine(buffer);
+      if (!fullContent.trim()) throw new Error("模型未返回可用内容，请检查模型设置后重试");
       // 流结束后确保最终内容完整上屏
+      if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
       if (typeof global.renderMarkdown !== "undefined") {
         bubbleElement.innerHTML = global.renderMarkdown(fullContent);
       } else {
         bubbleElement.textContent = fullContent;
       }
+      // 部分网关发送 [DONE] 后不主动断开连接；主动取消可释放悬挂的读取。
+      if (sawDone) {
+        try { await streamReader.cancel(); } catch (e) { /* 忽略清理错误 */ }
+      }
       return fullContent;
     } catch (err) {
       bubbleElement.classList.remove("loading");
-      bubbleElement.textContent = "❌ 请求失败: " + err.message;
+      if (timedOut) {
+        bubbleElement.textContent = "❌ 请求超时（超过 " + Math.round(timeoutMs / 1000) + " 秒）。请检查 Endpoint、模型和网络后重试。";
+      } else if (err && err.name === "AbortError") {
+        bubbleElement.textContent = "❌ 请求已中止。请检查网络后重试。";
+      } else if (err && /^API 请求失败（HTTP /.test(err.message)) {
+        bubbleElement.textContent = "❌ " + err.message + "。请检查 Endpoint、模型和 API Key 配置后重试。";
+      } else if (err && /流式数据|模型未返回/.test(err.message)) {
+        bubbleElement.textContent = "❌ " + err.message + "。请更换模型或检查 Endpoint 后重试。";
+      } else {
+        bubbleElement.textContent = "❌ 请求未能完成。请检查 Endpoint、模型、网络后重试。";
+      }
+      console.error("流式 AI 请求失败:", err);
       return null;
+    } finally {
+      clearTimeout(timeoutId);
+      if (renderTimer) clearTimeout(renderTimer);
+      if (outerSignal) outerSignal.removeEventListener("abort", onOuterAbort);
+      if (streamReader) {
+        try { streamReader.releaseLock(); } catch (e) { /* 忽略清理错误 */ }
+      }
     }
   };
 

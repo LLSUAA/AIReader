@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
 
+  // 数据库名属于历史内部标识，品牌迁移时保持不变，确保已有本地数据继续可读。
   const DB_NAME = "AIReaderDB";
   const STORE_NAME = "books";
   const DB_VERSION = 3;

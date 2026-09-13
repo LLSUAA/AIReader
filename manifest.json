@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "AIReader - 深度阅读伴侣",
+  "name": "读见 - 深度阅读与知识提取工具",
   "version": "1.1.0",
-  "description": "硬核 AI 辅助阅读器，极简、极速的阅读+AI心智伴随体验",
+  "description": "把书读成框架，把理解沉淀为自己的知识资产",
   "permissions": ["storage", "activeTab"],
   "host_permissions": ["https://api.deepseek.com/*"],
   "action": {
-    "default_title": "打开 AIReader 阅读引擎"
+    "default_title": "打开读见阅读引擎"
   },
   "background": {
     "service_worker": "background.js"

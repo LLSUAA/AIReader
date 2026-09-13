@@ -1,13 +1,19 @@
-# AGENTS.md — AIReader 项目协作约定
+# AGENTS.md — 读见项目协作约定
 
 > 本文件面向所有在此仓库工作的 AI 代理（Codex / Trae / Cursor 等）与人类协作者。
 > **动手改代码之前，先读本文件。**
 
 ## 1. 项目是什么
 
-AIReader 是一个**本地优先**的 Chrome 扩展（Manifest V3）：导入 EPUB/TXT 后分页阅读，并提供四个 AI 陪读技能（前文复盘 / 提炼本章骨架 / 解释选中段落 / 沙盘推演测验）。书籍与知识晶体只存在本地 IndexedDB；AI 通过用户自配的 DeepSeek（OpenAI 兼容协议）API 调用。
+读见（原 AIReader）是一个**本地优先**的 Chrome 扩展（Manifest V3）：导入 EPUB/TXT 后分页阅读，并提供四个 AI 陪读技能（前文复盘 / 提炼本章骨架 / 解释选中段落 / 盲盒式推演测验）。书籍与知识晶体只存在本地 IndexedDB；AI 通过用户自配的 DeepSeek（OpenAI 兼容协议）API 调用。
 
-项目定位（2026-08 规划确认）：不做"阅读器"，做"**知识提取器**"——帮助深度阅读者把一本书的核心框架在 30 分钟内结构化提取出来。
+当前用户品牌为“读见”，品牌口号是“读进去，想明白”。`AIReader` 仅作为历史数据库名、旧协议和兼容标识保留，不得因为改名而迁移或清空已有本地数据。
+
+长期北极星是“本地认知工作台”；近期正式定位是“面向研究型创作者和深度阅读者的、本地优先的‘阅读到观点’工作台”。当前第一验证用户是项目 Owner；研究型创作者 / 独立内容生产者是待验证的候选外部 ICP。不要把这一定义扩张为通用认知平台、NotebookLM 替代品或万能研究工具。
+
+战略上的最终价值对象是“用户确认后的认知产物”，而不是自动摘要，也不立即把“观点”设为全系统的数据中心。人工校准、观点卡、Creator Brief 与轻量 Challenge 均为候选能力，当前未实现。
+
+任何新功能在开工前必须回答：**它是否帮助用户从原始材料形成自己的、可核对的认知产物，并且有 Owner 或候选用户的真实失败案例支持？**不能回答时，默认不属于当前主线。
 
 ## 2. 不可破坏的底线（最高优先级）
 
@@ -22,9 +28,10 @@ AIReader 是一个**本地优先**的 Chrome 扩展（Manifest V3）：导入 EP
 ```text
 manifest.json        # MV3 声明；入口：library.html / reader.html / options.html
 background.js        # Service Worker：点击图标 → 打开 library.html
-library.html/css/js  # 书架大厅：导入、书架、知识武器库
+library.html/css/js  # 书架大厅：导入、书架、知识晶体
 reader.html/css/js   # 阅读器：阅读区 + AI 面板 + 目录导航
 options.html/js      # 配置中心：API Key / 模型 / Endpoint
+skills/brand.js       # 品牌常量（用户品牌为“读见”，内部旧标识保持兼容）
 skills/db.js         # IndexedDB 封装（books / principles）
 skills/api.js        # SSE 流式网关（含渲染节流、max_tokens 按技能配置）
 skills/extract.js    # 全书框架分层提取管线（Map-Reduce + 取消机制）
@@ -69,13 +76,39 @@ docs/                # 报告、快照、归档
 4. 修改存储逻辑后：确认旧书与新书进度互不干扰，书名为 `apikey.epub` 时配置不被破坏。
 5. 修改 AI 链路后：确认聊天气泡无原始 HTML 注入（可在 API 返回中故意含 `<img onerror>` 验证）。
 
-## 8. 封存问题（不要重新打开）
+## 7. 封存问题（不要重新打开）
 
 - **CFI 溯源跳转**（2026-08-02 封存）：单章大书/嵌套文档下翻页定位失效。已尝试构建期 CFI 与运行时文本定位两套方案，根因涉及 epub.js 0.3 对已显示章节的 `locationOf` 坐标滚动。在解封前：不要在提取管线上继续投入修复；README 与 UI 保持"实验性"标注。修复方向（择一）：强制重渲染章节后 display(cfi)、段落→页码缓存、`book.locations.generate()` 性能换精度、或降级为"跳章节+滚动段落"。
 
-## 7. 变更纪律（正式项目流程）
+## 8. 变更纪律（正式项目流程）
 
 - **先快照再大改**：涉及重构或新版本前，按 `docs/snapshots/README.md` 打 git tag + 写 SNAPSHOT.md。
 - **更新日志**：每次用户可见变更同步更新 `CHANGELOG.md`（Keep a Changelog 格式），并在 Unreleased 下按 Added/Fixed/Changed 分组。
 - **提交信息**：`type(scope): 摘要`，如 `fix(reader): 修复关闭书籍按钮 ReferenceError`；一次提交只做一件事，涉及多文件可分组提交。
 - **文档同步**：功能/约定变化时同步更新 README 与 AGENTS.md，不留下"代码与文档打架"的欠账。
+- **能力状态**：正式文档必须区分 `Current`、`Prototype / Experimental`、`Candidate / Planned`、`Deferred`、`Historical / Superseded`。当前工作区、`v1.1.0` 标签和 `origin/main` 不是同一事实层，不得混写。
+
+## 9. 项目指挥与交接纪律
+
+项目采用“长期指挥中枢 + 按工作包结束的执行会话 + 按 Gate 新开的审计会话”协作方式。项目状态以 Git、测试/手工验证记录和 `docs/HANDOFF_CURRENT.md` 为准，不以长对话历史为准。
+
+- **Commander（总指挥）**：可以决定优先级、范围、验收与 Gate，不在执行任务中擅自扩大产品方向。每次面向 Owner 的回复必须附“指挥报告”：当前阶段、已完成、风险/阻塞、下一工作包、Gate 判断、任务类型与指定模型。
+- **Executor（执行）**：只能在批准的工作包范围内改动；完成后必须更新 `docs/HANDOFF_CURRENT.md`，列出改动、验证、遗留风险和建议下一步。不得自行启动下一工作包或改变产品战略。
+- **Auditor（审计）**：只检查指定基线或增量范围，输出 `GO / CONDITIONAL GO / NO-GO`、P0/P1/P2、证据和下一 Gate；默认不修改代码或文档。
+
+每个工作包都必须明确标记以下字段：
+
+```text
+TYPE: EXECUTION | AUDIT
+MODEL: <精确模型 ID> / <reasoning effort>
+目标、允许修改、禁止修改、验收标准、必须验证、交接要求
+```
+
+模型分工默认如下；若任务事实显示不适合，Commander 必须在工作包中说明升级或降级原因：
+
+- `EXECUTION`：核心功能、缺陷修复、跨文件实现默认 `gpt-5.6-terra / medium`；跨 5 个以上核心模块、核心存储/安全/提取管线高风险改动可升级为 `gpt-5.6-sol / medium` 或 `high`。
+- `EXECUTION`：文档同步、搜索、机械替换、简单检查默认 `gpt-5.6-luna / medium`。
+- `AUDIT`：里程碑或架构/产品偏航审计默认 `gpt-5.6-sol / high`；普通验收优先由 Commander 依据 diff 与验证记录完成，不滥用全盘审计。
+- `Commander`：日常拆包与验收推荐 `gpt-5.6-terra / high`；改变战略、核心数据契约或安全边界时使用 `gpt-5.6-sol / high`。
+
+审计分为增量审计与全盘审计。全盘审计只在正式发布候选、方法论/架构重大重构完成、公开放量前使用；其余重要节点只审自上次 Gate 以来的 diff、文档、验证记录和样本结果。

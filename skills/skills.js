@@ -33,7 +33,7 @@
         historyText = historyText.trim();
         return { text: historyText.length > 15000 ? historyText.substring(historyText.length - 15000) : historyText };
       },
-      buildPrompt: (text) => `作为深度阅读伴侣，请你根据以下读者刚读过的背景内容，给出一份『前情提要与核心主线串联』。
+      buildPrompt: (text) => `作为读见的深度阅读伴侣，请你根据以下读者刚读过的背景内容，给出一份『前情提要与核心主线串联』。
 要求：不要报流水账，提取出推动内容发展的隐性线索（如逻辑递进、人物情感裂变、核心冲突演化），帮助复盘底层认知框架：\n\n${text}`
     },
     chapter: {

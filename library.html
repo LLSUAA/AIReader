@@ -3,90 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AIReader - 数字中枢</title>
+  <title>读见 - 深度阅读与知识提取工具</title>
   <link rel="stylesheet" href="library.css">
 </head>
 <body>
-  <div class="sidebar">
+  <aside class="sidebar">
     <div class="logo">
-      <img src="icons/icon32.png" class="logo-icon" style="width:24px; height:24px; border-radius:4px;">
-      <span>AIReader</span>
+      <img src="icons/icon32.png" class="logo-icon" alt="">
+      <div><strong>读见</strong><span>读进去，想明白</span></div>
     </div>
-    <nav class="nav-menu">
+
+    <nav class="nav-menu" aria-label="工作台导航">
+      <span class="nav-label">工作台</span>
       <a href="#" class="nav-item active" data-target="view-books">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-        我的书架
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 016.5 3H11v16H6.5A2.5 2.5 0 004 21.5v-16zM20 5.5A2.5 2.5 0 0017.5 3H13v16h4.5a2.5 2.5 0 012.5 2.5v-16z"/></svg>
+        <span>我的书架</span>
       </a>
       <a href="#" class="nav-item" data-target="view-arsenal">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-        知识武器库
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 4.6L19 9.8l-3.5 3.6.8 5.1L12 16.1 7.7 18.5l.8-5.1L5 9.8l4.8-2.2L12 3z"/></svg>
+        <span>知识晶体</span>
       </a>
       <a href="#" class="nav-item" data-target="view-about">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-        关于本插件
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        <span>关于读见</span>
       </a>
       <a href="options.html" target="_blank" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        配置中心
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.4 1A8 8 0 0014.4 5L14 2h-4l-.4 3a8 8 0 00-2.1 1.2l-2.4-1-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.4-1A8 8 0 009.6 19l.4 3h4l.4-3a8 8 0 002.1-1.2l2.4 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
+        <span>配置中心</span>
       </a>
     </nav>
-  </div>
-  
+
+    <div class="sidebar-foot">
+      <div class="local-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0110 0v2M5 10h14v10H5z"/></svg>
+        <div><strong>内容保存在本机</strong><span>书籍与知识晶体不会上传到读见服务器</span></div>
+      </div>
+      <button class="theme-toggle" id="library-theme" title="切换深浅色主题">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        <span>切换主题</span>
+      </button>
+    </div>
+  </aside>
+
   <main class="main-content">
-    
-    <div id="view-books" class="view-section active">
-      <div class="section-header">
-        <h2>我的书架</h2>
+    <section id="view-books" class="view-section active">
+      <header class="section-header shelf-header">
+        <div>
+          <span class="section-kicker">本地书架</span>
+          <h1>继续你的阅读</h1>
+          <p>把 EPUB 或 TXT 放进来，从上次停下的位置继续。</p>
+        </div>
         <label class="btn-primary">
-          导入新书
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>导入书籍</span>
           <input type="file" id="lib-file-input" accept=".epub,.txt" hidden>
         </label>
+      </header>
+      <div class="shelf-context">
+        <span id="book-count">正在读取本地书架…</span>
+        <span>支持 EPUB / TXT · 可拖拽导入</span>
       </div>
-      <div class="bg-watermark">📥 支持全局拖拽导入 EPUB 书籍</div>
-      <div class="book-grid" id="book-grid"></div>
-    </div>
+      <div class="import-status" id="import-status" role="status" aria-live="polite"></div>
+      <div class="book-grid" id="book-grid" aria-live="polite"></div>
+    </section>
 
-    <div id="view-arsenal" class="view-section" style="display: none;">
-      <div class="section-header">
-        <h2>知识武器库</h2>
-        <span class="subtitle">你淬炼出的所有宏观认知与交易原则</span>
-      </div>
-      <div class="principle-list" id="principle-list"></div>
-    </div> 
-    
-    <div id="view-about" class="view-section" style="display: none;">
-      <div class="section-header">
-        <h2>关于本插件</h2>
-        <span class="subtitle">AIReader - 斯巴达式硬核精读指南</span>
-      </div>
-      <div class="p-text" style="max-width: 800px;">
-        <h3>核心理念</h3>
-        <p>本插件致力于提供“沉浸式”与“反人性”的硬核精读体验。通过“盲盒锁死”的强制输出机制与底层逻辑拆解，拒绝被动投喂，帮助你搭建属于自己的跨学科数字研究院。</p>
-        
-        <h3>四大核心技能</h3>
+    <section id="view-arsenal" class="view-section">
+      <header class="section-header">
+        <div>
+          <span class="section-kicker">本地沉淀</span>
+          <h1>知识晶体</h1>
+          <p>回看你在陪读对话中主动保存的内容。</p>
+        </div>
+        <span class="collection-count" id="principle-count">正在读取…</span>
+      </header>
+      <div class="principle-list" id="principle-list" aria-live="polite"></div>
+    </section>
+
+    <section id="view-about" class="view-section">
+      <header class="section-header">
+        <div>
+          <span class="section-kicker">关于读见</span>
+          <h1>读进去，想明白</h1>
+          <p>面向深度阅读者的本地优先阅读工作台。</p>
+        </div>
+      </header>
+      <article class="about-content prose">
+        <h2>阅读不是接受答案</h2>
+        <p>读见通过上下文陪读、结构提取与主动提问，帮助你复原作者的论证、回到原文核对，并保留自己的判断位置。AI 输出是辅助材料，不是已经形成的个人观点。</p>
+
+        <h2>当前可以做什么</h2>
         <ul>
-          <li><strong>前文复盘回顾：</strong> 提取隐性线索，串联底层认知框架。</li>
-          <li><strong>提炼本章骨架：</strong> 直击第一性原理，剥离冗余修饰。</li>
-          <li><strong>解释选中段落：</strong> 跨语境映射，用现实案例具象化复杂概念。</li>
-          <li><strong>沙盘推演测验：</strong> 抛出高阶反问，UI 强制锁死，逼迫你完成逻辑闭环。</li>
+          <li><strong>前文复盘：</strong>串联已读内容中的线索与关系。</li>
+          <li><strong>本章骨架：</strong>提炼当前章节的结构与论证。</li>
+          <li><strong>解释选段：</strong>把复杂概念连接到具体语境。</li>
+          <li><strong>推演测验（原型）：</strong>用问题促使你先写下自己的理解。</li>
+          <li><strong>全书框架（实验性）：</strong>分块提取并保留可回看的来源标记。</li>
         </ul>
 
-        <h3>知识武器库</h3>
-        <p>阅读中与导师对话产生的每一次顿悟，都可点击“🌟 收藏为知识晶体”，它们将永久沉淀在你的第二大脑中，并可随时一键复制流转。</p>
-      </div>
-    </div>
-
+        <h2>你的内容，留在本地</h2>
+        <p>书籍、阅读进度、提取缓存与知识晶体保存在浏览器本地。只有在你明确发起 AI 请求时，相关上下文才会发送到你自己配置的服务端点。</p>
+      </article>
+    </section>
   </main>
 
-  <div id="drag-overlay" class="drag-overlay" style="display: none;">
+  <div id="drag-overlay" class="drag-overlay">
     <div class="drag-content">
-      <div style="font-size: 64px; margin-bottom: 16px;">📥</div>
-      <h2>松开鼠标，将书籍导入书架</h2>
+      <div class="drag-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 4v11M8 8l4-4 4 4M5 15v5h14v-5"/></svg>
+      </div>
+      <h2>松开即可导入书架</h2>
+      <p>支持 EPUB 与 TXT，内容只保存在本机。</p>
     </div>
   </div>
 
   <script src="jszip.min.js"></script>
   <script src="marked.min.js"></script>
+  <script src="skills/brand.js"></script>
   <script src="skills/markdown.js"></script>
   <script src="skills/db.js"></script>
   <script src="skills/library.js"></script>

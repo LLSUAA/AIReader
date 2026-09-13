@@ -3,139 +3,217 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AIReader - 深度阅读伴侣</title>
+  <title>读见 - 深度阅读与知识提取工具</title>
   <link rel="stylesheet" href="reader.css">
 </head>
 <body>
+  <div class="app" data-reading-mode="continuous">
+    <nav class="toc-panel" id="toc-panel" aria-label="书籍目录">
+      <div class="toc-header">
+        <span>本书目录</span>
+        <span class="toc-header-hint">选择章节跳转</span>
+      </div>
+      <div class="toc-list" id="toc-list"></div>
+    </nav>
 
-  <div class="app">
-
-    <!-- ====== 左侧：主阅读区 ====== -->
     <main class="reader-pane" id="reader-pane">
-
-      <!-- ====== 目录侧栏 ====== -->
-      <div class="toc-panel" id="toc-panel">
-        <div class="toc-header">目录</div>
-        <div class="toc-list" id="toc-list"></div>
-      </div>
-
-      <!-- 加载后的阅读渲染区 -->
       <div class="viewer-container" id="viewer-container">
-        <div class="topbar">
-          <span class="topbar-title" id="book-title">未命名书籍</span>
-          <div class="topbar-actions">
-            <button class="topbar-btn" id="btn-home" title="返回大厅">🏠</button>
-            <button class="topbar-btn" id="btn-lang" title="切换 AI 回复语言">中</button>
-            <button class="topbar-btn" id="btn-theme" title="切换深浅色主题">🌓</button>
-            <button class="topbar-btn" id="btn-toc" title="目录">📑</button>
-            <button class="topbar-btn" id="btn-close" title="关闭当前书籍">&times;</button>
+        <header class="topbar">
+          <div class="topbar-book">
+            <button class="topbar-btn topbar-btn-home" id="btn-home" title="返回书架" aria-label="返回书架">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+              <span>书架</span>
+            </button>
+            <span class="topbar-divider" aria-hidden="true"></span>
+            <span class="topbar-title" id="book-title">未命名书籍</span>
           </div>
-        </div>
-        <div id="viewer" class="viewer"></div>
-        <div class="bottombar">
-          <button class="nav-btn" id="btn-prev" title="上一页 (←)">← 上一页</button>
-          <span class="page-indicator" id="page-indicator">—</span>
-          <button class="nav-btn" id="btn-next" title="下一页 (→)">下一页 →</button>
-        </div>
-      </div>
+          <div class="topbar-actions" aria-label="阅读设置">
+            <div class="reading-mode-switch" role="group" aria-label="阅读模式">
+              <button class="reading-mode-btn active" id="btn-mode-continuous" type="button" aria-pressed="true">连续</button>
+              <button class="reading-mode-btn" id="btn-mode-paginated" type="button" aria-pressed="false">分页</button>
+            </div>
+            <button class="topbar-btn" id="btn-toc" title="打开目录" aria-label="打开目录" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11"/></svg>
+              <span>目录</span>
+            </button>
+            <button class="topbar-btn" id="btn-lang" title="切换 AI 回复语言" aria-label="切换 AI 回复语言">中</button>
+            <button class="topbar-btn" id="btn-theme" title="当前：浅色主题，点击切换为深色" aria-label="当前：浅色主题，点击切换为深色" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+              <span>浅色</span>
+            </button>
+            <button class="topbar-btn topbar-btn-quiet" id="btn-close" title="关闭当前书籍">关闭</button>
+          </div>
+        </header>
 
+        <div id="viewer" class="viewer"></div>
+
+        <footer class="bottombar">
+          <button class="nav-btn" id="btn-prev" title="上一页 (←)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>上一页</span>
+          </button>
+          <div class="reading-progress" aria-label="阅读进度">
+            <span class="reading-progress-label">阅读进度</span>
+            <span class="page-indicator" id="page-indicator">—</span>
+          </div>
+          <button class="nav-btn" id="btn-next" title="下一页 (→)">
+            <span>下一页</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </footer>
+      </div>
     </main>
 
-    <!-- ====== 右侧：AI 心智面板 ====== -->
-    <aside class="ai-pane" id="ai-pane">
-      <div class="ai-header">
-        <span class="ai-header-title">AI 陪读面板</span>
-      </div>
+    <aside class="ai-pane" id="ai-pane" aria-label="陪读工作区">
+      <header class="ai-header">
+        <div>
+          <span class="section-kicker">上下文辅助</span>
+          <h1 class="ai-header-title">陪读工作区</h1>
+        </div>
+        <div class="ai-header-controls">
+          <span class="ai-workspace-status" id="ai-status" data-state="ready" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="ai-status-text">可开始</span>
+          </span>
+          <button class="ai-collapse-btn" id="btn-ai-toggle" type="button" title="收起陪读工作区" aria-label="收起陪读工作区" aria-expanded="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
+        <span class="ai-collapsed-label" aria-hidden="true">陪读</span>
+      </header>
 
-      <div class="ai-actions">
-        <button class="ai-btn" data-action="history">
-          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          前文复盘回顾
-        </button>
-        <button class="ai-btn" data-action="chapter">
-          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-          </svg>
-          提炼本章骨架
-        </button>
-        <button class="ai-btn" data-action="explain">
-          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
-          </svg>
-          解释选中段落
-        </button>
-        <button class="ai-btn" data-action="quiz">
-          <svg class="ai-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
-          </svg>
-          沙盘推演测验
-        </button>
+      <section class="ai-actions" aria-label="陪读动作">
+        <div class="action-section-head">
+          <span>基于当前阅读位置</span>
+          <span>选择一个动作</span>
+        </div>
+        <div class="action-grid">
+          <button class="ai-btn" data-action="history">
+            <svg class="ai-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span><strong>前文复盘</strong><small>串联已读线索</small></span>
+          </button>
+          <button class="ai-btn" data-action="chapter">
+            <svg class="ai-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>
+            <span><strong>本章骨架</strong><small>提炼论证结构</small></span>
+          </button>
+          <button class="ai-btn" data-action="explain">
+            <svg class="ai-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H8l-4 3V5zM8 9h8M8 13h5"/></svg>
+            <span><strong>解释选段</strong><small>连接语境与实例</small></span>
+          </button>
+          <button class="ai-btn" data-action="quiz">
+            <svg class="ai-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 014.6 1c0 1.8-2.4 2.1-2.4 3.7M12 17h.01"/></svg>
+            <span><strong>推演测验</strong><small>主动检验理解</small></span>
+          </button>
+        </div>
         <button class="ai-btn extract-btn" id="btn-extract">
-          📖 一键提取全书框架
+          <svg class="ai-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 016.5 3H11v16H6.5A2.5 2.5 0 004 21.5v-16zM20 5.5A2.5 2.5 0 0017.5 3H13v16h4.5a2.5 2.5 0 012.5 2.5v-16z"/></svg>
+          <span><strong>提取全书框架</strong><small>实验性 · 分块处理并保留来源</small></span>
+          <svg class="extract-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
         </button>
-      </div>
+      </section>
 
-      <div class="chat-container" id="chat-container">
+      <div class="chat-container" id="chat-container" aria-live="polite">
         <div class="chat-placeholder">
-          <svg class="chat-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-          </svg>
-          <p>AI 陪读伴侣</p>
-          <p class="chat-placeholder-hint">点击上方按钮或输入问题开始对话</p>
+          <div class="chat-placeholder-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5zM8 9h8M8 13h5"/></svg>
+          </div>
+          <p>从正在阅读的内容开始</p>
+          <p class="chat-placeholder-hint">选择上方动作，或写下你此刻真正想追问的问题。</p>
         </div>
       </div>
 
       <div class="chat-input-area">
-        <textarea id="chat-input" placeholder="输入你的推演或向导师提问..." rows="2"></textarea>
-        <button id="btn-send">发送</button>
+        <label class="sr-only" for="chat-input">向陪读工作区提问</label>
+        <textarea id="chat-input" placeholder="写下问题，Enter 发送，Shift + Enter 换行" rows="2"></textarea>
+        <button id="btn-send">
+          <span>发送</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
     </aside>
-
   </div>
 
-  <!-- ====== 全书框架提取弹窗 ====== -->
-  <div class="extract-modal" id="extract-modal">
+  <div class="extract-modal" id="extract-modal" role="dialog" aria-modal="true" aria-labelledby="extract-modal-title">
     <div class="extract-modal-content">
-      <div class="extract-modal-header">
-        <span class="extract-modal-title">📖 一键提取全书框架</span>
-        <button class="extract-close" id="extract-close" title="关闭">×</button>
-      </div>
+      <header class="extract-modal-header">
+        <div>
+          <span class="section-kicker">实验性能力</span>
+          <h2 class="extract-modal-title" id="extract-modal-title">全书框架提取</h2>
+        </div>
+        <button class="extract-close" id="extract-close" title="关闭" aria-label="关闭提取窗口">×</button>
+      </header>
+
       <div class="extract-body">
-        <div class="extract-progress-wrap" id="extract-progress-wrap">
-          <div class="extract-progress-head">
-            <span>提取进度</span>
-            <span class="extract-timer" id="extract-timer">⏱ 00:00</span>
+        <section class="extract-progress-wrap" id="extract-progress-wrap" aria-live="polite">
+          <div class="extract-narrative">
+            <div class="extract-stage-summary">
+              <span class="extract-stage-label" id="extract-phase-label">准备书籍</span>
+              <strong class="extract-stage-title" id="extract-progress-text">正在解析书籍结构…</strong>
+              <span class="extract-current" id="extract-current">读取章节与段落</span>
+            </div>
+            <div class="extract-metrics">
+              <div><span>分块</span><strong id="extract-count">—</strong></div>
+              <div><span>用时</span><strong class="extract-timer" id="extract-timer">00:00</strong></div>
+            </div>
           </div>
-          <div class="extract-progress-bar">
+
+          <ol class="extract-stages" aria-label="提取阶段">
+            <li class="extract-stage is-active" data-phase="parse"><span>1</span><div><strong>解析</strong><small>读取书籍结构</small></div></li>
+            <li class="extract-stage" data-phase="map"><span>2</span><div><strong>分块提取</strong><small>逐块识别结构</small></div></li>
+            <li class="extract-stage" data-phase="reduce"><span>3</span><div><strong>综合框架</strong><small>组织全书脉络</small></div></li>
+            <li class="extract-stage" data-phase="done"><span>4</span><div><strong>完成</strong><small>回看与导出</small></div></li>
+          </ol>
+
+          <div class="extract-progress-head">
+            <span>分块完成度</span>
+            <span id="extract-progress-percent">等待分块</span>
+          </div>
+          <div class="extract-progress-bar" role="progressbar" aria-label="分块提取进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="extract-progress-fill" id="extract-progress-fill"></div>
           </div>
-          <div class="extract-progress-text" id="extract-progress-text">准备中...</div>
-        </div>
-        <div class="extract-status" id="extract-status"></div>
-        <div class="extract-result" id="extract-result"></div>
-        <div class="extract-actions" id="extract-actions">
-          <button class="btn-extract-action primary" id="extract-copy">📋 复制 Markdown</button>
-          <button class="btn-extract-action" id="extract-download">⬇️ 下载 .md</button>
-          <button class="btn-extract-action" id="extract-again">🔄 重新提取</button>
+
+          <div class="extract-activity" id="extract-status">
+            <span class="extract-activity-label">当前处理</span>
+            <span class="extract-activity-text">等待开始</span>
+          </div>
+          <p class="extract-note">分块并发处理，完成顺序可能不同；进度只按已完成分块计算。关闭窗口将先确认是否取消。</p>
+        </section>
+
+        <section class="extract-result-shell" id="extract-result-shell">
+          <div class="extract-result-head">
+            <div>
+              <span class="result-status">框架已就绪</span>
+              <h3>回看结构，再决定如何使用</h3>
+            </div>
+            <span class="experimental-note">来源跳转为实验性</span>
+          </div>
+          <div class="extract-actions" id="extract-actions">
+            <button class="btn-extract-action primary" id="extract-copy">复制 Markdown</button>
+            <button class="btn-extract-action" id="extract-download">下载 .md</button>
+            <button class="btn-extract-action quiet" id="extract-again">重新提取</button>
+          </div>
+          <div class="extract-result" id="extract-result"></div>
+        </section>
+
+        <div class="extract-failure" id="extract-failure" role="alert">
+          <div><strong>本次提取未完成</strong><span id="extract-error-text">请检查配置或网络后重试。</span></div>
+          <button class="btn-extract-action" id="extract-retry">重试提取</button>
         </div>
         <button class="extract-cancel" id="extract-cancel">取消提取</button>
       </div>
     </div>
   </div>
 
-  <!-- 注意：epub.js 运行时解压 EPUB 依赖 JSZip，必须先加载，勿删 -->
+  <!-- epub.js 运行时解压 EPUB 依赖 JSZip，必须先加载，勿删 -->
   <script src="jszip.min.js"></script>
   <script src="epub.min.js"></script>
-  
   <script src="marked.min.js"></script>
+  <script src="skills/brand.js"></script>
   <script src="skills/markdown.js"></script>
   <script src="skills/db.js"></script>
   <script src="skills/api.js"></script>
   <script src="skills/extract.js"></script>
   <script src="skills/skills.js"></script>
-  
   <script src="skills/reader.js"></script>
 </body>
 </html>
